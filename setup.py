@@ -26,14 +26,17 @@ setup(
     author="Cosmian Tech",
     author_email="tech@cosmian.com",
     description="Intel SGX Remote Attestation verification library",
-    packages=find_packages("src"),
+    packages=find_packages(where="src"),
     package_dir={"": "src"},
     long_description=Path("README.md").read_text(),
     long_description_content_type="text/markdown",
     zip_safe=False,
     install_requires=["requests>=2.28.1,<3.0.0", "cryptography>=39.0.0,<40.0.0"],
     entry_points={
-        "console_scripts": ["sgx-ra-verify = intel_sgx_ra.cli:run"],
+        "console_scripts": [
+            "sgx-ra-verify = intel_sgx_ra.cli.verify:run",
+            "sgx-ra-utils = intel_sgx_ra.cli.utils:run",
+        ],
     },
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -2,17 +2,70 @@
 
 import hashlib
 import logging
+import socket
 import ssl
 from pathlib import Path
-from typing import Union, cast
+from typing import Tuple, Union, cast
+from urllib.parse import urlparse
 
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
-from intel_sgx_ra.error import RATLSVerificationError, SGXQuoteNotFound
+from intel_sgx_ra.error import (
+    CertificateError,
+    RATLSVerificationError,
+    SGXQuoteNotFound,
+)
 from intel_sgx_ra.quote import Quote
 
 SGX_QUOTE_EXTENSION_OID = x509.ObjectIdentifier("1.2.840.113741.1337.6")
+
+
+def url_parse(url: str) -> Tuple[str, int]:
+    """Parse `url` and output 2-tuple (host, port)."""
+    port: str = "80"
+
+    if "https" in url:
+        port = "443"
+
+    host: str = urlparse(url).netloc
+
+    if ":" in host:
+        host, port = host.split(":")
+
+    return host, int(port)
+
+
+def get_server_certificate(
+    addr: Tuple[str, int], ssl_version=ssl.PROTOCOL_TLS_CLIENT
+) -> str:
+    """Get TLS certificate from `addr`.
+
+    Parameters
+    ----------
+    addr : Tuple[str, int]
+        2-tuple (host, port).
+    ssl_version: ssl._SSLMethod
+        SSL protocol version.
+
+    Notes
+    -----
+    Don't use `ssl.get_server_certificate()` because there are some
+    issues with Server Name Indication (SNI) extension on some
+    OpenSSL/LibreSSL versions (particularly on MacOS).
+
+    """
+    host, port = addr
+    with socket.create_connection((host, port), timeout=10) as sock:
+        context = ssl.SSLContext(ssl_version)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+        with context.wrap_socket(sock, server_hostname=host) as ssock:
+            cert = ssock.getpeercert(True)
+            if not cert:
+                raise CertificateError("Can't get peer certificate")
+            return ssl.DER_cert_to_PEM_cert(cert)
 
 
 def get_quote_from_cert(ratls_cert: Union[bytes, x509.Certificate]) -> Quote:
@@ -65,13 +118,9 @@ def ratls_verification(ratls_cert: Union[str, bytes, Path, x509.Certificate]) ->
 
 def ratls_verification_from_url(url: str) -> Quote:
     """RA-TLS verification from HTTPS URL."""
-    hostname: str = url.lstrip("https://")
-    port: str = "443"
+    host, port = url_parse(url)  # type: str, int
 
-    if ":" in hostname:
-        hostname, port = hostname.split(":")
-
-    ca_data: bytes = ssl.get_server_certificate((hostname, int(port))).encode("utf-8")
+    ca_data: bytes = get_server_certificate((host, port)).encode("utf-8")
     ratls_cert: x509.Certificate = x509.load_pem_x509_certificate(ca_data)
 
     return ratls_verification(ratls_cert)

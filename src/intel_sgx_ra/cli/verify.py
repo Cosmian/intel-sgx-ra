@@ -1,7 +1,8 @@
-"""intel_sgx_ra.cli module."""
+"""intel_sgx_ra.cli.verify module."""
 
 import argparse
 import logging
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -18,8 +19,10 @@ from intel_sgx_ra.error import (
 from intel_sgx_ra.quote import Quote
 from intel_sgx_ra.ratls import ratls_verification, ratls_verification_from_url
 
+BASE_URL: str = os.getenv("PCCS_URL", "https://pccs.mse.cosmian.com")
 
-def parse_args():
+
+def parse_args() -> argparse.Namespace:
     """CLI argument parser."""
     parser = argparse.ArgumentParser(description="Intel SGX DCAP Quote verification")
     parser.add_argument("--verbose", action="store_true", help="Verbose mode")
@@ -33,11 +36,15 @@ def parse_args():
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
 
     cert_parser = subparsers.add_parser(
-        "certificate", help="Remote Attestation for ra-tls X.509 certificate"
+        "certificate", help="Remote Attestation from X.509 certificate used for RA-TLS"
     )
     group = cert_parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--path", type=Path, help="Path to ra-tls X.509 certificate")
-    group.add_argument("--url", type=str, help="HTTPS URL to fetch X.509 certificate")
+    group.add_argument(
+        "--path", type=Path, help="Path to X.509 certificate used for RA-TLS"
+    )
+    group.add_argument(
+        "--url", type=str, help="HTTPS URL to fetch X.509 certificate used for RA-TLS"
+    )
 
     quote_parser = subparsers.add_parser(
         "quote", help="Remote Attestation of a raw SGX quote"
@@ -48,7 +55,7 @@ def parse_args():
 
 
 # pylint: disable=too-many-branches
-def run():
+def run() -> None:
     """Entrypoint of the CLI."""
     logging.basicConfig(format="%(message)s", level=logging.INFO)
     args = parse_args()
@@ -67,7 +74,7 @@ def run():
         raise CommandNotFound("Bad subcommand!")
 
     try:
-        remote_attestation(quote=quote, base_url="https://pccs.cosmian.com")
+        remote_attestation(quote=quote, base_url=BASE_URL)
     except SGXQuoteNotFound:
         traceback.print_exc()
         sys.exit(1)
