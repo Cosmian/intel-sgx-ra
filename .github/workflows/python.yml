@@ -37,7 +37,7 @@ jobs:
 
       - name: Import check with isort
         run: |
-          isort --check $PYTHONPATH
+          isort --check --diff $PYTHONPATH
 
       - name: Lint check with pylint
         run: |

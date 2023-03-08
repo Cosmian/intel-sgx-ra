@@ -27,3 +27,7 @@ class CommandNotFound(Exception):
 
 class CryptoKeyError(Exception):
     """Cryptographic key error."""
+
+
+class CertificateError(Exception):
+    """Server certificate error."""
