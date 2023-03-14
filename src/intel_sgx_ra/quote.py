@@ -11,8 +11,8 @@ RE_CERT: re.Pattern = re.compile(
     b"(-----BEGIN CERTIFICATE-----\n.*?\n-----END CERTIFICATE-----)", re.DOTALL
 )
 
+HEADER = struct.Struct(">HH4sHHI32s")
 REPORT_BODY = struct.Struct(">16sI12s16sQQ32s32s32s32s64sHHH42s16s64s")
-QUOTE = struct.Struct(">HH4sHHI32s384s")
 
 
 @dataclass
@@ -131,8 +131,8 @@ class ReportBody:  # 384 bytes
 
 
 @dataclass
-class Quote:
-    """SGX quote structure."""
+class Header:
+    """SGX quote header."""
 
     version: int  # 0
     sign_type: int  # 2
@@ -141,69 +141,161 @@ class Quote:
     pce_svn: int  # 10
     xeid: int  # 12
     basename: bytes  # 16
+
+    @classmethod
+    def from_bytes(cls, raw_header: bytes) -> "Header":
+        """Deserialize bytes of SGX quote header."""
+        return cls(*HEADER.unpack(raw_header))
+
+    def __bytes__(self) -> bytes:
+        """Serialize Header."""
+        return HEADER.pack(
+            self.version,
+            self.sign_type,
+            self.epid_group_id,
+            self.qe_svn,
+            self.pce_svn,
+            self.xeid,
+            self.basename,
+        )
+
+    def to_dict(self):
+        """Dataclass to dict."""
+        return asdict(self)
+
+
+@dataclass
+class AuthData:
+    """SGX auth data."""
+
+    signature: bytes  # 0
+    public_key: bytes  # 64
+    qe_report: bytes  # 128
+    qe_report_signature: bytes  # 512
+    qe_auth_data: bytes  # 576
+    certification_data_type: int
+    certification_data: bytes
+
+    @classmethod
+    def from_bytes(cls, raw_auth_data: bytes) -> "AuthData":
+        """Deserialize bytes of SGX auth data."""
+        offset: int = 0
+        signature: bytes = raw_auth_data[offset : offset + 64]
+        offset += 64
+        public_key: bytes = raw_auth_data[offset : offset + 64]
+        offset += 64
+        qe_report: bytes = raw_auth_data[offset : offset + 384]
+        offset += 384
+        qe_report_signature: bytes = raw_auth_data[offset : offset + 64]
+        offset += 64
+        qe_auth_data_len: int = int.from_bytes(
+            raw_auth_data[offset : offset + 2], byteorder="little"
+        )
+        offset += 2
+        qe_auth_data: bytes = raw_auth_data[offset : offset + qe_auth_data_len]
+        offset += qe_auth_data_len
+        certification_data_type: int = int.from_bytes(
+            raw_auth_data[offset : offset + 2], byteorder="little"
+        )
+        offset += 2
+        certification_data_len: int = int.from_bytes(
+            raw_auth_data[offset : offset + 4], byteorder="little"
+        )
+        offset += 4
+        certification_data: bytes = raw_auth_data[
+            offset : offset + certification_data_len
+        ]
+        offset += certification_data_len
+
+        assert len(raw_auth_data) == offset
+
+        return cls(
+            signature,
+            public_key,
+            qe_report,
+            qe_report_signature,
+            qe_auth_data,
+            certification_data_type,
+            certification_data,
+        )
+
+    def __bytes__(self) -> bytes:
+        """Serialize AuthData."""
+        return (
+            self.signature
+            + self.public_key
+            + self.qe_report
+            + self.qe_report_signature
+            + len(self.qe_auth_data).to_bytes(2, byteorder="little")
+            + self.qe_auth_data
+            + self.certification_data_type.to_bytes(2, byteorder="little")
+            + len(self.certification_data).to_bytes(4, byteorder="little")
+            + self.certification_data
+        )
+
+    def to_dict(self):
+        """Dataclass to dict."""
+        return asdict(self)
+
+
+@dataclass
+class Quote:
+    """SGX quote structure."""
+
+    header: Header  # 0
     report_body: ReportBody  # 48
-    signature_len: int  # 432
-    signature: bytes  # 436
+    auth_data_len: int  # 432
+    auth_data: AuthData  # 436
 
     @classmethod
     def from_bytes(cls, raw_quote: bytes) -> "Quote":
         """Deserialize bytes of sgx_quote structure."""
         view: memoryview = memoryview(raw_quote)
 
-        offset: int = 48 + 384
-        (
-            version,
-            sign_type,
-            epid_group_id,
-            qe_svn,
-            pce_svn,
-            xeid,
-            basename,
-            raw_report_body,
-        ) = QUOTE.unpack(view[:offset])
-        report_body: ReportBody = ReportBody.from_bytes(raw_report_body)
-        signature_len: int = int.from_bytes(
+        offset: int = 0
+
+        header: Header = Header.from_bytes(bytes(view[offset : offset + 48]))
+        offset += 48
+
+        report_body: ReportBody = ReportBody.from_bytes(
+            bytes(view[offset : offset + 384])
+        )
+        offset += 384
+
+        auth_data_len: int = int.from_bytes(
             view[offset : offset + 4], byteorder="little"
         )
         offset += 4
-        signature: bytes = bytes(view[offset:])
+        assert auth_data_len == len(raw_quote[offset:])
 
-        assert len(signature) == signature_len
+        raw_auth_data: bytes = bytes(view[offset : offset + auth_data_len])
+        offset += auth_data_len
+        assert (
+            len(raw_quote) == offset
+        ), f"Expected length is {len(raw_quote)} found {offset}"
+        auth_data: AuthData = AuthData.from_bytes(raw_auth_data)
 
         return cls(
-            version,
-            sign_type,
-            epid_group_id,
-            qe_svn,
-            pce_svn,
-            xeid,
-            basename,
+            header,
             report_body,
-            signature_len,
-            signature,
+            auth_data_len,
+            auth_data,
         )
 
     def __bytes__(self) -> bytes:
         """Serialize Quote."""
         return (
-            QUOTE.pack(
-                self.version,
-                self.sign_type,
-                self.epid_group_id,
-                self.qe_svn,
-                self.pce_svn,
-                self.xeid,
-                self.basename,
-                bytes(self.report_body),
-            )
-            + self.signature_len.to_bytes(4, byteorder="little")
-            + self.signature
+            bytes(self.header)
+            + bytes(self.report_body)
+            + self.auth_data_len.to_bytes(4, byteorder="little")
+            + bytes(self.auth_data)
         )
 
     def certs(self) -> Tuple[bytes, bytes, bytes]:
-        """Find all certificates in signature field."""
+        """Find all certificates in auth data."""
         return cast(
-            Tuple[bytes, bytes, bytes], tuple(re.findall(RE_CERT, self.signature))
+            Tuple[bytes, bytes, bytes],
+            tuple(re.findall(RE_CERT, self.auth_data.certification_data)),
         )
 
     def to_dict(self):
