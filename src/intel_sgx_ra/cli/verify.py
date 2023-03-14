@@ -8,7 +8,7 @@ import traceback
 from pathlib import Path
 from pprint import pformat
 
-from intel_sgx_ra.attest import remote_attestation
+from intel_sgx_ra.attest import verify_quote
 from intel_sgx_ra.error import (
     CertificateRevokedError,
     CommandNotFound,
@@ -17,7 +17,7 @@ from intel_sgx_ra.error import (
     SGXQuoteNotFound,
 )
 from intel_sgx_ra.quote import Quote
-from intel_sgx_ra.ratls import ratls_verification, ratls_verification_from_url
+from intel_sgx_ra.ratls import ratls_verify, ratls_verify_from_url
 
 BASE_URL: str = os.getenv("PCCS_URL", "https://pccs.mse.cosmian.com")
 
@@ -64,9 +64,9 @@ def run() -> None:
 
     if args.command == "certificate":
         quote = (
-            ratls_verification(args.path.read_bytes())
+            ratls_verify(args.path.read_bytes())
             if args.path
-            else ratls_verification_from_url(args.url)
+            else ratls_verify_from_url(args.url)
         )
     elif args.command == "quote":
         quote = Quote.from_bytes(args.path.resolve().read_bytes())
@@ -74,7 +74,7 @@ def run() -> None:
         raise CommandNotFound("Bad subcommand!")
 
     try:
-        remote_attestation(quote=quote, base_url=BASE_URL)
+        verify_quote(quote=quote, base_url=BASE_URL)
     except SGXQuoteNotFound:
         traceback.print_exc()
         sys.exit(1)

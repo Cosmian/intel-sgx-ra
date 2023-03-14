@@ -87,7 +87,7 @@ def get_quote_from_cert(ratls_cert: Union[bytes, x509.Certificate]) -> Quote:
     return Quote.from_bytes(quote_extension.value)
 
 
-def ratls_verification(ratls_cert: Union[str, bytes, Path, x509.Certificate]) -> Quote:
+def ratls_verify(ratls_cert: Union[str, bytes, Path, x509.Certificate]) -> Quote:
     """Check user_report_data in SGX quote to match SHA256(cert.public_key())."""
     cert: x509.Certificate
 
@@ -106,9 +106,7 @@ def ratls_verification(ratls_cert: Union[str, bytes, Path, x509.Certificate]) ->
     )
     success: bool = hashlib.sha256(pk).digest() == quote.report_body.report_data[:32]
 
-    logging.info(
-        "[ %4s ] ra-tls verification of public key", "OK" if success else "FAIL"
-    )
+    logging.info("[ %4s ] RA-TLS public key fingerprint", "OK" if success else "FAIL")
 
     if not success:
         raise RATLSVerificationError
@@ -116,11 +114,11 @@ def ratls_verification(ratls_cert: Union[str, bytes, Path, x509.Certificate]) ->
     return quote
 
 
-def ratls_verification_from_url(url: str) -> Quote:
+def ratls_verify_from_url(url: str) -> Quote:
     """RA-TLS verification from HTTPS URL."""
     host, port = url_parse(url)  # type: str, int
 
     ca_data: bytes = get_server_certificate((host, port)).encode("utf-8")
     ratls_cert: x509.Certificate = x509.load_pem_x509_certificate(ca_data)
 
-    return ratls_verification(ratls_cert)
+    return ratls_verify(ratls_cert)
