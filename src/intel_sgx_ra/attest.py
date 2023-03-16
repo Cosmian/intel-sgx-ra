@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.hazmat.primitives.hashes import SHA256, HashAlgorithm
 
+from intel_sgx_ra import globs
 from intel_sgx_ra.error import CertificateRevokedError, SGXDebugModeError
 from intel_sgx_ra.pccs import get_pck_cert_crl, get_root_ca_crl
 from intel_sgx_ra.quote import Quote
@@ -24,7 +25,7 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
     # If set, then the enclave is in debug mode
     debug: bool = bool(quote.report_body.flags & SGX_FLAGS_DEBUG)
 
-    logging.info("[ %4s ] No SGX debug mode", "FAIl" if debug else "OK")
+    logging.info("%s No SGX debug mode", globs.FAIL if debug else globs.OK)
 
     if debug:
         raise SGXDebugModeError
@@ -42,7 +43,7 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
     # Check that Intel Root CA signed Intel Root CA CRL
     assert root_ca_crl.is_signature_valid(root_ca_pk)
     if root_ca_crl.get_revoked_certificate_by_serial_number(root_ca_cert.serial_number):
-        logging.info("[ %4s ] Check Intel Root CA certificate against CRL", "FAIL")
+        logging.info("%s Check Intel Root CA certificate against CRL", globs.FAIL)
         raise CertificateRevokedError("Intel Root CA certificate revoked")
 
     pck_platform_crl = get_pck_cert_crl(base_url, "platform")
@@ -51,10 +52,10 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
     if pck_platform_crl.get_revoked_certificate_by_serial_number(
         pck_platform_ca_cert.serial_number
     ):
-        logging.info("[ %4s ] Check Intel PCK Platform certificate against CRL", "FAIL")
+        logging.info("%s Check Intel PCK Platform certificate against CRL", globs.FAIL)
         raise CertificateRevokedError("Intel PCK Platform certificate revoked")
 
-    logging.info("[ %4s ] Check Certificate Revocation List (CRL)", "OK")
+    logging.info("%s Check Certificate Revocation List (CRL)", globs.OK)
 
     try:
         # 1) Check Intel Root CA is self-signed
@@ -78,10 +79,10 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
             ec.ECDSA(cast(HashAlgorithm, pck_cert.signature_hash_algorithm)),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("[ %4s ] Certification chain", "FAIL")
+        logging.info("%s Certification chain", globs.FAIL)
         raise exc
 
-    logging.info("[ %4s ] Certification chain", "OK")
+    logging.info("%s Certification chain", globs.OK)
 
     pk = ec.EllipticCurvePublicNumbers(
         curve=ec.SECP256R1(),
@@ -99,10 +100,10 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
             signature_algorithm=ec.ECDSA(SHA256()),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("[ %4s ] Quote signature", "FAIL")
+        logging.info("%s Quote signature", globs.FAIL)
         raise exc
 
-    logging.info("[ %4s ] Quote signature", "OK")
+    logging.info("%s Quote signature", globs.OK)
 
     try:
         pck_pk.verify(
@@ -118,7 +119,7 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
             signature_algorithm=ec.ECDSA(SHA256()),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("[ %4s ] QE report signature", "FAIL")
+        logging.info("%s QE report signature", globs.FAIL)
         raise exc
 
-    logging.info("[ %4s ] QE report signature", "OK")
+    logging.info("%s QE report signature", globs.OK)
