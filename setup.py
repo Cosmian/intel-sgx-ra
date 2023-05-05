@@ -31,7 +31,7 @@ setup(
     long_description=Path("README.md").read_text(),
     long_description_content_type="text/markdown",
     zip_safe=False,
-    install_requires=["requests>=2.28.1,<3.0.0", "cryptography>=39.0.0,<40.0.0"],
+    install_requires=["requests>=2.28.1,<3.0.0", "cryptography>=40.0.2,<40.1.0"],
     entry_points={
         "console_scripts": [
             "sgx-ra-verify = intel_sgx_ra.cli.verify:run",
