@@ -10,7 +10,11 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.hazmat.primitives.hashes import SHA256, HashAlgorithm
 
 from intel_sgx_ra import globs
-from intel_sgx_ra.error import CertificateRevokedError, SGXDebugModeError
+from intel_sgx_ra.error import (
+    CertificateError,
+    CertificateRevokedError,
+    SGXDebugModeError,
+)
 from intel_sgx_ra.pccs import get_pck_cert_crl, get_root_ca_crl
 from intel_sgx_ra.quote import Quote
 
@@ -30,12 +34,12 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
     if debug:
         raise SGXDebugModeError
 
-    pck_cert, pck_platform_ca_cert, root_ca_cert = [
+    pck_cert, pck_platf_or_proc_ca_cert, root_ca_cert = [
         x509.load_pem_x509_certificate(raw_cert) for raw_cert in quote.certs()
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
-    pck_pk, pck_platform_ca_pk, root_ca_pk = (
+    pck_pk, pck_platf_or_proc_ca_pk, root_ca_pk = (
         cast(ec.EllipticCurvePublicKey, pck_cert.public_key()),
-        cast(ec.EllipticCurvePublicKey, pck_platform_ca_cert.public_key()),
+        cast(ec.EllipticCurvePublicKey, pck_platf_or_proc_ca_cert.public_key()),
         cast(ec.EllipticCurvePublicKey, root_ca_cert.public_key()),
     )
 
@@ -46,11 +50,22 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
         logging.info("%s Check Intel Root CA certificate against CRL", globs.FAIL)
         raise CertificateRevokedError("Intel Root CA certificate revoked")
 
-    pck_platform_crl = get_pck_cert_crl(base_url, "platform")
-    # Check that Intel PCK Platform signed Intel PCK CRL
-    assert pck_platform_crl.is_signature_valid(pck_platform_ca_pk)
-    if pck_platform_crl.get_revoked_certificate_by_serial_number(
-        pck_platform_ca_cert.serial_number
+    common_name, *_ = pck_platf_or_proc_ca_cert.subject.get_attributes_for_oid(
+        x509.NameOID.COMMON_NAME
+    )
+
+    pck_platf_or_proc_crl: x509.CertificateRevocationList
+    if common_name.value == "Intel SGX PCK Platform CA":
+        pck_platf_or_proc_crl = get_pck_cert_crl(base_url, "platform")
+    elif common_name.value == "Intel SGX PCK Processor CA":
+        pck_platf_or_proc_crl = get_pck_cert_crl(base_url, "processor")
+    else:
+        raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
+
+    # Check that Intel PCK Platform/Processor signed Intel PCK CRL
+    assert pck_platf_or_proc_crl.is_signature_valid(pck_platf_or_proc_ca_pk)
+    if pck_platf_or_proc_crl.get_revoked_certificate_by_serial_number(
+        pck_platf_or_proc_ca_cert.serial_number
     ):
         logging.info("%s Check Intel PCK Platform certificate against CRL", globs.FAIL)
         raise CertificateRevokedError("Intel PCK Platform certificate revoked")
@@ -64,16 +79,16 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
             root_ca_cert.tbs_certificate_bytes,
             ec.ECDSA(cast(HashAlgorithm, root_ca_cert.signature_hash_algorithm)),
         )
-        # 2) Check Intel Root CA signed Intel PCK Platform CA
+        # 2) Check Intel Root CA signed Intel PCK Platform/Processor CA
         root_ca_pk.verify(
-            pck_platform_ca_cert.signature,
-            pck_platform_ca_cert.tbs_certificate_bytes,
+            pck_platf_or_proc_ca_cert.signature,
+            pck_platf_or_proc_ca_cert.tbs_certificate_bytes,
             ec.ECDSA(
-                cast(HashAlgorithm, pck_platform_ca_cert.signature_hash_algorithm)
+                cast(HashAlgorithm, pck_platf_or_proc_ca_cert.signature_hash_algorithm)
             ),
         )
-        # 3) Check Intel PCK Platform CA signed Intel PCK certificate
-        pck_platform_ca_pk.verify(
+        # 3) Check Intel PCK Platform/Processor CA signed Intel PCK certificate
+        pck_platf_or_proc_ca_pk.verify(
             pck_cert.signature,
             pck_cert.tbs_certificate_bytes,
             ec.ECDSA(cast(HashAlgorithm, pck_cert.signature_hash_algorithm)),
