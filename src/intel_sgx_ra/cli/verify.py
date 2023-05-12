@@ -8,6 +8,7 @@ import traceback
 from pathlib import Path
 from pprint import pformat
 
+from intel_sgx_ra import globs
 from intel_sgx_ra.attest import verify_quote
 from intel_sgx_ra.error import (
     CertificateRevokedError,
@@ -19,7 +20,7 @@ from intel_sgx_ra.error import (
 from intel_sgx_ra.quote import Quote
 from intel_sgx_ra.ratls import ratls_verify, ratls_verify_from_url
 
-BASE_URL: str = os.getenv("PCCS_URL", "https://pccs.mse.cosmian.com")
+PCCS_URL: str = os.getenv("PCCS_URL", "https://pccs.mse.cosmian.com")
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,7 +75,7 @@ def run() -> None:
         raise CommandNotFound("Bad subcommand!")
 
     try:
-        verify_quote(quote=quote, base_url=BASE_URL)
+        verify_quote(quote=quote, pccs_url=PCCS_URL)
     except SGXQuoteNotFound:
         traceback.print_exc()
         sys.exit(1)
@@ -90,16 +91,16 @@ def run() -> None:
 
     if args.mrenclave:
         if quote.report_body.mr_enclave == bytes.fromhex(args.mrenclave):
-            logging.info("[   OK ] MRENCLAVE matches expected value")
+            logging.info("%s MRENCLAVE matches expected value", globs.OK)
         else:
-            logging.info("[ FAIL ] MRENCLAVE matches expected value")
+            logging.info("%s MRENCLAVE matches expected value", globs.FAIL)
             sys.exit(5)
 
     if args.mrsigner:
         if quote.report_body.mr_signer == bytes.fromhex(args.mrsigner):
-            logging.info("[   OK ] MRSIGNER matches expected value")
+            logging.info("%s MRSIGNER matches expected value", globs.OK)
         else:
-            logging.info("[ FAIL ] MRSIGNER matches expected value")
+            logging.info("%s MRSIGNER matches expected value", globs.FAIL)
             sys.exit(6)
 
     if args.verbose:

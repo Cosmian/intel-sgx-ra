@@ -6,7 +6,7 @@ class SGXQuoteNotFound(Exception):
 
 
 class RATLSVerificationError(Exception):
-    """Cert public key different from report_data in SGX quote."""
+    """Certificate's public key different from report_data in SGX quote."""
 
 
 class SGXDebugModeError(Exception):
@@ -14,7 +14,7 @@ class SGXDebugModeError(Exception):
 
 
 class CertificateRevokedError(Exception):
-    """Intel Root CA revoked."""
+    """Certificate has been revoked."""
 
 
 class PCCSResponseError(Exception):

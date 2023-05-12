@@ -70,7 +70,7 @@ def get_server_certificate(
 
 
 def get_quote_from_cert(ratls_cert: Union[bytes, x509.Certificate]) -> Quote:
-    """Extract SGX quote from X509 certificate."""
+    """Extract SGX quote from X.509 certificate."""
     cert: x509.Certificate = (
         x509.load_pem_x509_certificate(ratls_cert)
         if isinstance(ratls_cert, bytes)
@@ -89,7 +89,7 @@ def get_quote_from_cert(ratls_cert: Union[bytes, x509.Certificate]) -> Quote:
 
 
 def ratls_verify(ratls_cert: Union[str, bytes, Path, x509.Certificate]) -> Quote:
-    """Check user_report_data in SGX quote to match SHA256(cert.public_key())."""
+    """Compare `report_data` field in SGX quote with SHA256(ratls_cert.public_key())."""
     cert: x509.Certificate
 
     if isinstance(ratls_cert, bytes):

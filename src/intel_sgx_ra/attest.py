@@ -22,7 +22,7 @@ from intel_sgx_ra.quote import Quote
 SGX_FLAGS_DEBUG: int = 2
 
 
-def verify_quote(quote: Union[Quote, bytes], base_url: str):
+def verify_quote(quote: Union[Quote, bytes], pccs_url: str):
     """Process DCAP remote attestation with `quote`."""
     quote = cast(Quote, Quote.from_bytes(quote) if isinstance(quote, bytes) else quote)
 
@@ -43,7 +43,7 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
         cast(ec.EllipticCurvePublicKey, root_ca_cert.public_key()),
     )
 
-    root_ca_crl: x509.CertificateRevocationList = get_root_ca_crl(base_url)
+    root_ca_crl: x509.CertificateRevocationList = get_root_ca_crl(pccs_url)
     # Check that Intel Root CA signed Intel Root CA CRL
     assert root_ca_crl.is_signature_valid(root_ca_pk)
     if root_ca_crl.get_revoked_certificate_by_serial_number(root_ca_cert.serial_number):
@@ -56,9 +56,9 @@ def verify_quote(quote: Union[Quote, bytes], base_url: str):
 
     pck_platf_or_proc_crl: x509.CertificateRevocationList
     if common_name.value == "Intel SGX PCK Platform CA":
-        pck_platf_or_proc_crl = get_pck_cert_crl(base_url, "platform")
+        pck_platf_or_proc_crl = get_pck_cert_crl(pccs_url, "platform")
     elif common_name.value == "Intel SGX PCK Processor CA":
-        pck_platf_or_proc_crl = get_pck_cert_crl(base_url, "processor")
+        pck_platf_or_proc_crl = get_pck_cert_crl(pccs_url, "processor")
     else:
         raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
 

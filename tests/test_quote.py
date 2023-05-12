@@ -25,4 +25,4 @@ def test_quote_ra(data_path):
     raw_quote: bytes = (data_path / "quote.dat").read_bytes()
     quote: Quote = Quote.from_bytes(raw_quote)
 
-    verify_quote(quote, base_url="https://pccs.mse.cosmian.com")
+    verify_quote(quote, pccs_url="https://pccs.mse.cosmian.com")

@@ -16,26 +16,26 @@ from intel_sgx_ra.error import PCCSResponseError
 from intel_sgx_ra.quote import RE_CERT
 
 
-def get_crl_by_uri(base_url: str, uri: str) -> bytes:
+def get_crl_by_uri(pccs_url: str, uri: str) -> bytes:
     """Retrieve CRL by URI."""
     response = requests.get(
-        url=f"{base_url}/sgx/certification/v3/crl", json={"uri": uri}, timeout=30
+        url=f"{pccs_url}/sgx/certification/v4/crl", json={"uri": uri}, timeout=30
     )
 
     return response.content
 
 
-def get_root_ca_crl(base_url: str) -> CertificateRevocationList:
+def get_root_ca_crl(pccs_url: str) -> CertificateRevocationList:
     """Retrieve Root CA CRL."""
     response = requests.get(
-        url=f"{base_url}/sgx/certification/v3/rootcacrl", timeout=30
+        url=f"{pccs_url}/sgx/certification/v4/rootcacrl", timeout=30
     )
 
     return load_der_x509_crl(bytes.fromhex(response.text))
 
 
 def get_pck_certificate(
-    base_url: str,
+    pccs_url: str,
     encrypted_ppid: Optional[str],
     cpusvn: str,
     pcesvn: str,
@@ -44,7 +44,7 @@ def get_pck_certificate(
 ) -> str:
     """Retrieve PCK Certificate from parameters."""
     response = requests.get(
-        url=f"{base_url}/sgx/certification/v3/pckcert",
+        url=f"{pccs_url}/sgx/certification/v4/pckcert",
         params={
             "encrypted_ppid": encrypted_ppid,
             "cpusvn": cpusvn,
@@ -61,11 +61,11 @@ def get_pck_certificate(
 
 
 def get_pck_cert_crl(
-    base_url: str, ca: Literal["processor", "platform"]
+    pccs_url: str, ca: Literal["processor", "platform"]
 ) -> CertificateRevocationList:
     """Retrieve PCK CRL."""
     response = requests.get(
-        url=f"{base_url}/sgx/certification/v3/pckcrl",
+        url=f"{pccs_url}/sgx/certification/v4/pckcrl",
         params={"ca": ca, "encoding": "der"},
         timeout=30,
     )
@@ -74,11 +74,11 @@ def get_pck_cert_crl(
 
 
 def get_tcbinfo(
-    base_url: str, fmscp: str
+    pccs_url: str, fmscp: str
 ) -> Tuple[Tuple[Certificate, Certificate], Dict[str, Any]]:
     """Retrieve TCB info from `fmscp`."""
     response = requests.get(
-        url=f"{base_url}/sgx/certification/v3/tcb", params={"fmspc": fmscp}, timeout=30
+        url=f"{pccs_url}/sgx/certification/v4/tcb", params={"fmspc": fmscp}, timeout=30
     )
     cert_chain = unquote(response.headers["SGX-TCB-Info-Issuer-Chain"])
     tcb_cert, root_ca_cert, *others = [
@@ -95,11 +95,11 @@ def get_tcbinfo(
 
 
 def get_qe_identity(
-    base_url: str,
+    pccs_url: str,
 ) -> Tuple[Tuple[Certificate, Certificate], Dict[str, Any]]:
     """Retrieve Quoting Enclave Identity."""
     response = requests.get(
-        url=f"{base_url}/sgx/certification/v3/qe/identity", timeout=30
+        url=f"{pccs_url}/sgx/certification/v4/qe/identity", timeout=30
     )
 
     cert_chain = unquote(response.headers["SGX-Enclave-Identity-Issuer-Chain"])
@@ -116,11 +116,11 @@ def get_qe_identity(
 
 
 def get_qve_identity(
-    base_url: str,
+    pccs_url: str,
 ) -> Tuple[Tuple[Certificate, Certificate], Dict[str, Any]]:
     """Retrieve Quoting Verification Enclave Identity."""
     response = requests.get(
-        url=f"{base_url}/sgx/certification/v3/qve/identity", timeout=30
+        url=f"{pccs_url}/sgx/certification/v4/qve/identity", timeout=30
     )
 
     cert_chain = unquote(response.headers["SGX-Enclave-Identity-Issuer-Chain"])
