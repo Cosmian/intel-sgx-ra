@@ -11,8 +11,8 @@ RE_CERT: re.Pattern = re.compile(
     b"(-----BEGIN CERTIFICATE-----\n.*?\n-----END CERTIFICATE-----)", re.DOTALL
 )
 
-HEADER = struct.Struct(">HH4sHHI32s")
-REPORT_BODY = struct.Struct(">16sI12s16sQQ32s32s32s32s64sHHH42s16s64s")
+HEADER = struct.Struct("HH4sHHI32s")
+REPORT_BODY = struct.Struct("16sI12s16sQQ32s32s32s32s64sHHH42s16s64s")
 
 
 @dataclass
