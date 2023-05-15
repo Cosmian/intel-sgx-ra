@@ -11,7 +11,7 @@ def test_quote_parsing(data_path):
     assert quote
     assert bytes(quote) == raw_quote
     assert quote.report_body.mr_signer == bytes.fromhex(
-        "c1c161d0dd996e8a9847de67ea2c00226761f7715a2c422d3012ac10795a1ef5")
+        "ac2c9fa87e4c91768b1d0c47169466c50d5a98c790639fbaefe7352a59919980")
 
     pck_cert, pck_platform_ca_cert, root_ca_cert, *others = [
         x509.load_pem_x509_certificate(raw_cert)
