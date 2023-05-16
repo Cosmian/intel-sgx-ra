@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+from hashlib import sha256
 from typing import Union, cast
 
 import cryptography.exceptions
@@ -15,6 +16,7 @@ from intel_sgx_ra.error import (
     CertificateError,
     CertificateRevokedError,
     SGXDebugModeError,
+    SGXVerificationError,
 )
 from intel_sgx_ra.pccs import get_pck_cert_crl, get_root_ca_crl
 from intel_sgx_ra.quote import Quote
@@ -165,5 +167,12 @@ def verify_quote(quote: Union[Quote, bytes], pccs_url: str):
     except cryptography.exceptions.InvalidSignature as exc:
         logging.info("%s QE report signature", globs.FAIL)
         raise exc
+
+    expected_qe_report_data: bytes = sha256(
+        quote.auth_data.public_key + quote.auth_data.qe_auth_data
+    ).digest()
+
+    if quote.auth_data.qe_report.report_data[:32] != expected_qe_report_data:
+        raise SGXVerificationError("Unexpected REPORTDATA in QE report")
 
     logging.info("%s QE report signature", globs.OK)

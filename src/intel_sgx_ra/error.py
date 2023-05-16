@@ -5,6 +5,10 @@ class SGXQuoteNotFound(Exception):
     """SGX Quote extension not found in X509 certificate."""
 
 
+class SGXVerificationError(Exception):
+    """Error occured while verifying properties of SGX enclave."""
+
+
 class RATLSVerificationError(Exception):
     """Certificate's public key different from report_data in SGX quote."""
 
