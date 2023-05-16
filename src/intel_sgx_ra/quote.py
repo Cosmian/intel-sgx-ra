@@ -170,7 +170,7 @@ class AuthData:
 
     signature: bytes  # 0
     public_key: bytes  # 64
-    qe_report: bytes  # 128
+    qe_report: ReportBody  # 128
     qe_report_signature: bytes  # 512
     qe_auth_data: bytes  # 576
     certification_data_type: int
@@ -212,7 +212,7 @@ class AuthData:
         return cls(
             signature,
             public_key,
-            qe_report,
+            ReportBody.from_bytes(qe_report),
             qe_report_signature,
             qe_auth_data,
             certification_data_type,
@@ -224,7 +224,7 @@ class AuthData:
         return (
             self.signature
             + self.public_key
-            + self.qe_report
+            + bytes(self.qe_report)
             + self.qe_report_signature
             + len(self.qe_auth_data).to_bytes(2, byteorder="little")
             + self.qe_auth_data
