@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 from hashlib import sha256
-from typing import Union, cast
+from typing import Literal, Optional, Tuple, Union, cast
 
 import cryptography.exceptions
 from cryptography import x509
@@ -15,6 +15,7 @@ from intel_sgx_ra import globs
 from intel_sgx_ra.error import (
     CertificateError,
     CertificateRevokedError,
+    CollateralsError,
     SGXDebugModeError,
     SGXVerificationError,
 )
@@ -97,7 +98,23 @@ def verify_pck_chain(
     return True
 
 
-def verify_quote(quote: Union[Quote, bytes], pccs_url: str):
+def retrieve_collaterals(
+    pccs_url: str, ca: Literal["processor", "platform"]
+) -> Tuple[x509.CertificateRevocationList, x509.CertificateRevocationList]:
+    """Retrive collaterals from PCCS URL and PCK CA type."""
+    root_ca_crl: x509.CertificateRevocationList = get_root_ca_crl(pccs_url)
+    pck_ca_crl: x509.CertificateRevocationList = get_pck_cert_crl(pccs_url, ca)
+
+    return root_ca_crl, pck_ca_crl
+
+
+def verify_quote(
+    quote: Union[Quote, bytes],
+    collaterals: Optional[
+        Tuple[x509.CertificateRevocationList, x509.CertificateRevocationList]
+    ] = None,
+    pccs_url: Optional[str] = None,
+):
     """Process DCAP remote attestation with `quote`."""
     quote = cast(Quote, Quote.from_bytes(quote) if isinstance(quote, bytes) else quote)
 
@@ -113,17 +130,22 @@ def verify_quote(quote: Union[Quote, bytes], pccs_url: str):
         x509.load_pem_x509_certificate(raw_cert) for raw_cert in quote.certs()
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
 
-    root_ca_crl: x509.CertificateRevocationList = get_root_ca_crl(pccs_url)
-    common_name, *_ = pck_ca_cert.subject.get_attributes_for_oid(
-        x509.NameOID.COMMON_NAME
-    )
+    root_ca_crl: x509.CertificateRevocationList
     pck_ca_crl: x509.CertificateRevocationList
-    if common_name.value == "Intel SGX PCK Platform CA":
-        pck_ca_crl = get_pck_cert_crl(pccs_url, "platform")
-    elif common_name.value == "Intel SGX PCK Processor CA":
-        pck_ca_crl = get_pck_cert_crl(pccs_url, "processor")
+    if pccs_url is not None:
+        common_name, *_ = pck_ca_cert.subject.get_attributes_for_oid(
+            x509.NameOID.COMMON_NAME
+        )
+        if common_name.value == "Intel SGX PCK Platform CA":
+            root_ca_crl, pck_ca_crl = retrieve_collaterals(pccs_url, "platform")
+        elif common_name.value == "Intel SGX PCK Processor CA":
+            root_ca_crl, pck_ca_crl = retrieve_collaterals(pccs_url, "processor")
+        else:
+            raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
+    elif collaterals is not None:
+        root_ca_crl, pck_ca_crl = collaterals
     else:
-        raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
+        raise CollateralsError("Collaterals or PCCS URL missing")
 
     assert verify_pck_chain(
         root_ca_cert, pck_ca_cert, pck_cert, root_ca_crl, pck_ca_crl

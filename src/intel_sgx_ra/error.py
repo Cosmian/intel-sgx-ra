@@ -35,3 +35,7 @@ class CryptoKeyError(Exception):
 
 class CertificateError(Exception):
     """Server certificate error."""
+
+
+class CollateralsError(Exception):
+    """Collaterals are missing to verify quote."""
