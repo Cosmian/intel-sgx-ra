@@ -1,15 +1,17 @@
 """intel_ra_sgx.attest module."""
 
+import json
 import logging
 from datetime import datetime
 from hashlib import sha256
-from typing import Literal, Optional, Tuple, Union, cast
+from typing import Any, Dict, Literal, Optional, Tuple, Union, cast
 
 import cryptography.exceptions
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.hazmat.primitives.hashes import SHA256, HashAlgorithm
+from sgx_pck_extension import sgx_pck_extension_from_cert
 
 from intel_sgx_ra import globs
 from intel_sgx_ra.error import (
@@ -19,7 +21,7 @@ from intel_sgx_ra.error import (
     SGXDebugModeError,
     SGXVerificationError,
 )
-from intel_sgx_ra.pccs import get_pck_cert_crl, get_root_ca_crl
+from intel_sgx_ra.pccs import get_pck_cert_crl, get_root_ca_crl, get_tcbinfo
 from intel_sgx_ra.quote import Quote
 
 # define SGX_FLAGS_DEBUG 0x0000000000000002ULL
@@ -98,20 +100,77 @@ def verify_pck_chain(
     return True
 
 
+def verify_tcb(
+    tcb_info: bytes, tcb_cert: x509.Certificate, root_ca_cert: x509.Certificate
+) -> bool:
+    """Verify TCB information."""
+    now: datetime = datetime.utcnow()
+
+    tcb: Dict[str, Any] = json.loads(tcb_info)
+
+    assert tcb["tcbInfo"]["version"] == 3
+    assert tcb["tcbInfo"]["id"] == "SGX"
+    assert now < datetime.strptime(tcb["tcbInfo"]["nextUpdate"], "%Y-%m-%dT%H:%M:%SZ")
+
+    root_ca_pk = cast(ec.EllipticCurvePublicKey, root_ca_cert.public_key())
+
+    # Check issuers
+    root_ca_cert.verify_directly_issued_by(root_ca_cert)
+    tcb_cert.verify_directly_issued_by(root_ca_cert)
+
+    # Check expiration date of certificates
+    if not root_ca_cert.not_valid_before <= now <= root_ca_cert.not_valid_after:
+        raise CertificateError("Intel Root CA certificate has expired")
+    if not tcb_cert.not_valid_before <= now <= tcb_cert.not_valid_after:
+        raise CertificateError("Intel TCB certificate has expired")
+
+    try:
+        # 1) Check Intel Root CA is self-signed
+        root_ca_pk.verify(
+            root_ca_cert.signature,
+            root_ca_cert.tbs_certificate_bytes,
+            ec.ECDSA(cast(HashAlgorithm, root_ca_cert.signature_hash_algorithm)),
+        )
+        # 2) Check Intel Root CA signed Intel TCB certificate
+        root_ca_pk.verify(
+            tcb_cert.signature,
+            tcb_cert.tbs_certificate_bytes,
+            ec.ECDSA(cast(HashAlgorithm, tcb_cert.signature_hash_algorithm)),
+        )
+    except cryptography.exceptions.InvalidSignature as exc:
+        logging.info("%s TCB verification", globs.FAIL)
+        raise exc
+
+    logging.info("%s TCB verification", globs.OK)
+
+    return True
+
+
 def retrieve_collaterals(
-    pccs_url: str, ca: Literal["processor", "platform"]
-) -> Tuple[x509.CertificateRevocationList, x509.CertificateRevocationList]:
+    fmspc: bytes, pccs_url: str, ca: Literal["processor", "platform"]
+) -> Tuple[
+    bytes,
+    x509.Certificate,
+    x509.CertificateRevocationList,
+    x509.CertificateRevocationList,
+]:
     """Retrive collaterals from PCCS URL and PCK CA type."""
     root_ca_crl: x509.CertificateRevocationList = get_root_ca_crl(pccs_url)
     pck_ca_crl: x509.CertificateRevocationList = get_pck_cert_crl(pccs_url, ca)
+    tcb_info, tcb_cert = get_tcbinfo(pccs_url, fmspc)
 
-    return root_ca_crl, pck_ca_crl
+    return tcb_info, tcb_cert, root_ca_crl, pck_ca_crl
 
 
 def verify_quote(
     quote: Union[Quote, bytes],
     collaterals: Optional[
-        Tuple[x509.CertificateRevocationList, x509.CertificateRevocationList]
+        Tuple[
+            bytes,
+            x509.Certificate,
+            x509.CertificateRevocationList,
+            x509.CertificateRevocationList,
+        ]
     ] = None,
     pccs_url: Optional[str] = None,
 ):
@@ -130,6 +189,11 @@ def verify_quote(
         x509.load_pem_x509_certificate(raw_cert) for raw_cert in quote.certs()
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
 
+    sgx_pck_ext: Dict[str, Any] = sgx_pck_extension_from_cert(pck_cert)
+    fmspc: bytes = sgx_pck_ext["fmspc"]
+
+    tcb_info: bytes
+    tcb_cert: x509.Certificate
     root_ca_crl: x509.CertificateRevocationList
     pck_ca_crl: x509.CertificateRevocationList
     if pccs_url is not None:
@@ -137,19 +201,24 @@ def verify_quote(
             x509.NameOID.COMMON_NAME
         )
         if common_name.value == "Intel SGX PCK Platform CA":
-            root_ca_crl, pck_ca_crl = retrieve_collaterals(pccs_url, "platform")
+            (tcb_info, tcb_cert, root_ca_crl, pck_ca_crl) = retrieve_collaterals(
+                fmspc, pccs_url, "platform"
+            )
         elif common_name.value == "Intel SGX PCK Processor CA":
-            root_ca_crl, pck_ca_crl = retrieve_collaterals(pccs_url, "processor")
+            (tcb_info, tcb_cert, root_ca_crl, pck_ca_crl) = retrieve_collaterals(
+                fmspc, pccs_url, "processor"
+            )
         else:
             raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
     elif collaterals is not None:
-        root_ca_crl, pck_ca_crl = collaterals
+        tcb_info, tcb_cert, root_ca_crl, pck_ca_crl = collaterals
     else:
         raise CollateralsError("Collaterals or PCCS URL missing")
 
     assert verify_pck_chain(
         root_ca_cert, pck_ca_cert, pck_cert, root_ca_crl, pck_ca_crl
     )
+    assert verify_tcb(tcb_info, tcb_cert, root_ca_cert)
 
     ecdsa_attestation_pk = ec.EllipticCurvePublicNumbers(
         curve=ec.SECP256R1(),

@@ -73,25 +73,26 @@ def get_pck_cert_crl(
     return load_der_x509_crl(response.content)
 
 
-def get_tcbinfo(
-    pccs_url: str, fmscp: str
-) -> Tuple[Tuple[Certificate, Certificate], Dict[str, Any]]:
+def get_tcbinfo(pccs_url: str, fmscp: bytes) -> Tuple[bytes, Certificate]:
     """Retrieve TCB info from `fmscp`."""
     response = requests.get(
-        url=f"{pccs_url}/sgx/certification/v4/tcb", params={"fmspc": fmscp}, timeout=30
+        url=f"{pccs_url}/sgx/certification/v4/tcb",
+        params={"fmspc": fmscp.hex()},
+        timeout=30,
     )
-    cert_chain = unquote(response.headers["SGX-TCB-Info-Issuer-Chain"])
-    tcb_cert, root_ca_cert, *others = [
+
+    cert_chain = unquote(response.headers["TCB-Info-Issuer-Chain"])
+    tcb_cert, _root_ca_cert, *others = [
         load_pem_x509_certificate(raw_cert)
         for raw_cert in re.findall(RE_CERT, cert_chain.encode("utf-8"))
     ]
 
     if others:
         raise PCCSResponseError(
-            "More than 2 certifices in header SGX-TCB-Info-Issuer-Chain"
+            "More than 2 certifices in header TCB-Info-Issuer-Chain"
         )
 
-    return (tcb_cert, root_ca_cert), response.json()
+    return response.content, tcb_cert
 
 
 def get_qe_identity(
