@@ -114,24 +114,3 @@ def get_qe_identity(
         )
 
     return (tcb_cert, root_ca_cert), response.json()
-
-
-def get_qve_identity(
-    pccs_url: str,
-) -> Tuple[Tuple[Certificate, Certificate], Dict[str, Any]]:
-    """Retrieve Quoting Verification Enclave Identity."""
-    response = requests.get(
-        url=f"{pccs_url}/sgx/certification/v4/qve/identity", timeout=30
-    )
-
-    cert_chain = unquote(response.headers["SGX-Enclave-Identity-Issuer-Chain"])
-    tcb_cert, root_ca_cert, *others = [
-        load_pem_x509_certificate(raw_cert)
-        for raw_cert in re.findall(RE_CERT, cert_chain.encode("utf-8"))
-    ]
-    if others:
-        raise PCCSResponseError(
-            "More than 2 certifices in header SGX-Enclave-Identity-Issuer-Chain"
-        )
-
-    return (tcb_cert, root_ca_cert), response.json()
