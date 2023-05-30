@@ -147,7 +147,8 @@ def verify_tcb(
 
 
 def retrieve_collaterals(
-    fmspc: bytes, pccs_url: str, ca: Literal["processor", "platform"]
+    quote: Quote,
+    pccs_url: str,
 ) -> Tuple[
     bytes,
     x509.Certificate,
@@ -155,6 +156,25 @@ def retrieve_collaterals(
     x509.CertificateRevocationList,
 ]:
     """Retrive collaterals from PCCS URL and PCK CA type."""
+    pck_cert, pck_ca_cert, _root_ca_cert = [
+        x509.load_pem_x509_certificate(raw_cert) for raw_cert in quote.certs()
+    ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
+
+    sgx_pck_ext: Dict[str, Any] = sgx_pck_extension_from_cert(pck_cert)
+    fmspc: bytes = sgx_pck_ext["fmspc"]
+
+    common_name: x509.NameAttribute
+    common_name, *_ = pck_ca_cert.subject.get_attributes_for_oid(
+        x509.NameOID.COMMON_NAME
+    )
+    ca: Literal["processor", "platform"]
+    if common_name.value == "Intel SGX PCK Platform CA":
+        ca = "platform"
+    elif common_name.value == "Intel SGX PCK Processor CA":
+        ca = "processor"
+    else:
+        raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
+
     root_ca_crl: x509.CertificateRevocationList = get_root_ca_crl(pccs_url)
     pck_ca_crl: x509.CertificateRevocationList = get_pck_cert_crl(pccs_url, ca)
     tcb_info, tcb_cert = get_tcbinfo(pccs_url, fmspc)
@@ -189,27 +209,14 @@ def verify_quote(
         x509.load_pem_x509_certificate(raw_cert) for raw_cert in quote.certs()
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
 
-    sgx_pck_ext: Dict[str, Any] = sgx_pck_extension_from_cert(pck_cert)
-    fmspc: bytes = sgx_pck_ext["fmspc"]
-
     tcb_info: bytes
     tcb_cert: x509.Certificate
     root_ca_crl: x509.CertificateRevocationList
     pck_ca_crl: x509.CertificateRevocationList
     if pccs_url is not None:
-        common_name, *_ = pck_ca_cert.subject.get_attributes_for_oid(
-            x509.NameOID.COMMON_NAME
+        tcb_info, tcb_cert, root_ca_crl, pck_ca_crl = retrieve_collaterals(
+            quote, pccs_url
         )
-        if common_name.value == "Intel SGX PCK Platform CA":
-            (tcb_info, tcb_cert, root_ca_crl, pck_ca_crl) = retrieve_collaterals(
-                fmspc, pccs_url, "platform"
-            )
-        elif common_name.value == "Intel SGX PCK Processor CA":
-            (tcb_info, tcb_cert, root_ca_crl, pck_ca_crl) = retrieve_collaterals(
-                fmspc, pccs_url, "processor"
-            )
-        else:
-            raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
     elif collaterals is not None:
         tcb_info, tcb_cert, root_ca_crl, pck_ca_crl = collaterals
     else:
