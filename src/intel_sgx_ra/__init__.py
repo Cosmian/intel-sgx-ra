@@ -1,3 +1,3 @@
 """intel_sgx_ra module."""
 
-__version__ = "2.0a5"
+__version__ = "2.0a6"
