@@ -34,7 +34,7 @@ setup(
     install_requires=[
         "requests>=2.28.1,<3.0.0",
         "cryptography>=40.0.2,<40.1.0",
-        "sgx-pck-extension>=0.1.2,<0.2.0",
+        "sgx-pck-extension>=0.1.4,<0.2.0",
     ],
     entry_points={
         "console_scripts": [
