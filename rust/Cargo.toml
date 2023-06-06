@@ -1,0 +1,15 @@
+[package]
+name = "sgx_dcap_ratls"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "lib_sgx_dcap_ratls"
+crate-type = ["cdylib"]
+
+[dependencies]
+sgx_pck_extension = "0.1"
+
+[dependencies.pyo3]
+version = "0.19"
+features = ["extension-module"]

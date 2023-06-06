@@ -2,6 +2,7 @@ from cryptography import x509
 
 from intel_sgx_ra.quote import Quote
 from intel_sgx_ra.attest import verify_quote
+from intel_sgx_ra.pck import sgx_pck_extension_from_cert, SgxPckExtension
 
 
 def test_quote_parsing(data_path):
@@ -26,3 +27,14 @@ def test_quote_ra(data_path):
     quote: Quote = Quote.from_bytes(raw_quote)
 
     verify_quote(quote, pccs_url="https://pccs.mse.cosmian.com")
+
+
+def test_pck_extension(data_path):
+    raw_pck_cert: bytes = (data_path / "pck_cert.pem").read_bytes()
+    pck_cert: x509.Certificate = x509.load_pem_x509_certificate(raw_pck_cert)
+
+    pck_extension: SgxPckExtension = sgx_pck_extension_from_cert(pck_cert)
+
+    assert "fmspc" in pck_extension
+    assert isinstance(pck_extension["fmspc"], bytes)
+    assert len(pck_extension["fmspc"]) == 6

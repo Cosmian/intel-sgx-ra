@@ -11,7 +11,6 @@ from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.hazmat.primitives.hashes import SHA256, HashAlgorithm
-from sgx_pck_extension import sgx_pck_extension_from_cert
 
 from intel_sgx_ra import globs
 from intel_sgx_ra.error import (
@@ -22,6 +21,7 @@ from intel_sgx_ra.error import (
     SGXVerificationError,
 )
 from intel_sgx_ra.pccs import get_pck_cert_crl, get_root_ca_crl, get_tcbinfo
+from intel_sgx_ra.pck import SgxPckExtension, sgx_pck_extension_from_cert
 from intel_sgx_ra.quote import Quote
 
 # define SGX_FLAGS_DEBUG 0x0000000000000002ULL
@@ -160,7 +160,7 @@ def retrieve_collaterals(
         x509.load_pem_x509_certificate(raw_cert) for raw_cert in quote.certs()
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
 
-    sgx_pck_ext: Dict[str, Any] = sgx_pck_extension_from_cert(pck_cert)
+    sgx_pck_ext: SgxPckExtension = sgx_pck_extension_from_cert(pck_cert)
     fmspc: bytes = sgx_pck_ext["fmspc"]
 
     common_name: x509.NameAttribute

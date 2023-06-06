@@ -1,3 +1,0 @@
-cryptography>=40.0.2,<41.0.0
-requests>=2.30.0,<3.0.0
-sgx-pck-extension>=0.1.4,<0.2.0
