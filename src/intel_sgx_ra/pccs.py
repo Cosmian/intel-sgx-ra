@@ -16,15 +16,6 @@ from intel_sgx_ra.error import PCCSResponseError
 from intel_sgx_ra.quote import RE_CERT
 
 
-def get_crl_by_uri(pccs_url: str, uri: str) -> bytes:
-    """Retrieve CRL by URI."""
-    response = requests.get(
-        url=f"{pccs_url}/sgx/certification/v4/crl", json={"uri": uri}, timeout=30
-    )
-
-    return response.content
-
-
 def get_root_ca_crl(pccs_url: str) -> CertificateRevocationList:
     """Retrieve Root CA CRL."""
     response = requests.get(
