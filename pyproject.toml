@@ -7,14 +7,14 @@ build-backend = "maturin"
 
 [project]
 name = "intel-sgx-ra"
+version = "2.0a9"
+description = "Intel SGX Remote Attestation verification library"
 authors = [
     {name = "Cosmian Tech", email = "tech@cosmian.com"},
 ]
-description = "Intel SGX Remote Attestation verification library"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
-version = "2.0a8"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: 3",
