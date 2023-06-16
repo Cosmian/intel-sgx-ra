@@ -50,8 +50,10 @@ def test_pck_ca(data_path, pccs_url):
     )
     assert common_name.value == "Intel SGX PCK Platform CA"
 
-    pck_ca_crl = get_pck_cert_crl(pccs_url, "platform")
+    _root_ca_cert, _pck_ca_cert, pck_ca_crl = get_pck_cert_crl(pccs_url, "platform")
 
+    assert _root_ca_cert == root_ca_cert
+    assert _pck_ca_cert == pck_ca_cert
     assert pck_ca_crl.is_signature_valid(pck_ca_cert.public_key())
     assert pck_ca_crl.get_revoked_certificate_by_serial_number(pck_ca_cert.serial_number) is None
 
@@ -74,6 +76,6 @@ def test_pck(data_path, pccs_url):
     ) is None
     assert pck_cert.not_valid_before <= now <= pck_cert.not_valid_after
 
-    ((tcb_cert, root_ca_cert2), json_payload) = get_qe_identity(pccs_url)
-    assert root_ca_cert2 == root_ca_cert
+    tcb_info, _root_ca_cert, tcb_cert = get_qe_identity(pccs_url)
+    assert _root_ca_cert == root_ca_cert
     assert tcb_cert.not_valid_before <= now <= tcb_cert.not_valid_after

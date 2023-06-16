@@ -12,7 +12,19 @@ from intel_sgx_ra.error import CryptoKeyError
 
 
 def mr_signer_from_pk(public_key: Union[RSAPublicKey, Path, bytes]) -> bytes:
-    """Compute MRSIGNER from RSA public key."""
+    """Compute MRSIGNER value from RSA public key.
+
+    Parameters
+    ----------
+    public_key : Union[RSAPublicKey, Path, bytes]
+        RSA public key to compute MRSIGNER value.
+
+    Returns
+    -------
+    bytes
+        MRSIGNER which is the SHA256 digest of RSA public key modulus.
+
+    """
     pk: RSAPublicKey
 
     if isinstance(public_key, bytes):
@@ -29,21 +41,32 @@ def mr_signer_from_pk(public_key: Union[RSAPublicKey, Path, bytes]) -> bytes:
     return hashlib.sha256(modulus).digest()
 
 
-def mr_signer_from_cert(certificate: Union[x509.Certificate, Path, bytes]) -> bytes:
-    """Compute MRSIGNER from X.509 certificate."""
+def mr_signer_from_cert(ratls_cert: Union[str, bytes, Path, x509.Certificate]) -> bytes:
+    """Compute MRSIGNER from X.509 certificate.
+
+    Parameters
+    ----------
+    ratls_cert : Union[str, bytes, Path, x509.Certificate]
+        X.509 RA-TLS certificate containing Intel SGX quote.
+
+    Returns
+    -------
+    bytes
+        MRSIGNER which is the SHA256 digest of RSA public key modulus.
+
+    """
     cert: x509.Certificate
 
-    if isinstance(certificate, bytes):
-        cert = cast(x509.Certificate, x509.load_pem_x509_certificate(data=certificate))
-    elif isinstance(certificate, Path):
-        cert = cast(
-            x509.Certificate,
-            x509.load_pem_x509_certificate(data=Path(certificate).read_bytes()),
-        )
+    if isinstance(ratls_cert, bytes):
+        cert = x509.load_pem_x509_certificate(ratls_cert)
+    elif isinstance(ratls_cert, str):
+        cert = x509.load_pem_x509_certificate(ratls_cert.encode("utf-8"))
+    elif isinstance(ratls_cert, Path):
+        cert = x509.load_pem_x509_certificate(ratls_cert.read_bytes())
     else:
-        cert = certificate
+        cert = ratls_cert
 
     if not isinstance(cert.public_key(), RSAPublicKey):
-        raise CryptoKeyError("Certificate public key must be RSA public key")
+        raise CryptoKeyError("Certificate does not contain an RSA public key")
 
     return mr_signer_from_pk(cast(RSAPublicKey, cert.public_key()))

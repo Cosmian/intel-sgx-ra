@@ -11,7 +11,7 @@ from intel_sgx_ra.lib_sgx_dcap_ratls import sgx_pck_extension_from_pem
 
 
 class SgxType(Enum):
-    """Sub-structure SgxType."""
+    """Enum SgxType used in SgxPckExtension."""
 
     Standard = 0
     Scalable = 1

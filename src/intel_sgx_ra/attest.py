@@ -20,7 +20,12 @@ from intel_sgx_ra.error import (
     SGXDebugModeError,
     SGXVerificationError,
 )
-from intel_sgx_ra.pccs import get_pck_cert_crl, get_root_ca_crl, get_tcbinfo
+from intel_sgx_ra.pccs import (
+    get_pck_cert_crl,
+    get_qe_identity,
+    get_root_ca_crl,
+    get_tcbinfo,
+)
 from intel_sgx_ra.pck import SgxPckExtension, sgx_pck_extension_from_cert
 from intel_sgx_ra.quote import Quote
 
@@ -35,7 +40,27 @@ def verify_pck_chain(
     root_ca_crl: x509.CertificateRevocationList,
     pck_ca_crl: x509.CertificateRevocationList,
 ) -> bool:
-    """PCK certification chain validation."""
+    """PCK certification chain validation against CRLs.
+
+    Parameters
+    ----------
+    root_ca_cert : x509.Certificate
+        Intel SGX Root CA certificate.
+    pck_ca_cert : x509.Certificate
+        Intel SGX Processor/Platform CA certificate.
+    pck_cert : x509.Certificate
+        Intel SGX PCK certificate.
+    root_ca_crl : x509.CertificateRevocationList
+        Intel SGX Root CA Certificate Revocation List.
+    pck_ca_crl : x509.CertificateRevocationList
+        Intel SGX Platform/Processor CA Certificate Revocation List.
+
+    Returns
+    -------
+    bool
+        True if success, raise exception otherwise.
+
+    """
     now: datetime = datetime.utcnow()
 
     pck_ca_pk, root_ca_pk = (
@@ -103,7 +128,27 @@ def verify_pck_chain(
 def verify_tcb(
     tcb_info: bytes, tcb_cert: x509.Certificate, root_ca_cert: x509.Certificate
 ) -> bool:
-    """Verify TCB information."""
+    """Verify basic TCB information.
+
+    Parameters
+    ----------
+    tcb_info : bytes
+        Bytes of the JSON containing TcbInfoV3 (see [1]).
+    tcb_cert : x509.Certificate
+        Intel SGX TCB signing certificate.
+    root_ca_cert : x509.Certificate
+        Intel SGX Root CA certificate.
+
+    Returns
+    -------
+    bool
+        True if success, raise exception otherwise.
+
+    References
+    ----------
+    .. [1] https://api.portal.trustedservices.intel.com/documentation#pcs-tcb-info-model-v3
+
+    """  # noqa: E501 # pylint: disable=line-too-long
     now: datetime = datetime.utcnow()
 
     tcb: Dict[str, Any] = json.loads(tcb_info)
@@ -151,12 +196,32 @@ def retrieve_collaterals(
     pccs_url: str,
 ) -> Tuple[
     bytes,
+    bytes,
     x509.Certificate,
     x509.CertificateRevocationList,
     x509.CertificateRevocationList,
 ]:
-    """Retrive collaterals from PCCS URL and PCK CA type."""
-    pck_cert, pck_ca_cert, _root_ca_cert = [
+    """Retrieve collaterals from SGX quote and PCCS URL.
+
+    Parameters
+    ----------
+    quote : Quote
+        Intel SGX quote to retrieve related collaterals.
+    pccs_url : str
+        URL of the PCCS.
+
+    Returns
+    -------
+    Tuple[bytes,
+          bytes,
+          x509.Certificate,
+          x509.CertificateRevocationList,
+          x509.CertificateRevocationList]
+    TCB info, Quoting Enclave identity, Intel SGX TCB signing certificate,
+    Intel SGX Root CA CRL, Intel SGX PCK Platform/Processor CA CRL.
+
+    """
+    pck_cert, pck_ca_cert, root_ca_cert = [
         x509.load_pem_x509_certificate(raw_cert) for raw_cert in quote.certs()
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
 
@@ -176,10 +241,31 @@ def retrieve_collaterals(
         raise CertificateError("Unknown CN in Intel SGX PCK Platform/Processor CA")
 
     root_ca_crl: x509.CertificateRevocationList = get_root_ca_crl(pccs_url)
-    pck_ca_crl: x509.CertificateRevocationList = get_pck_cert_crl(pccs_url, ca)
-    tcb_info, tcb_cert = get_tcbinfo(pccs_url, fmspc)
+    _root_ca_cert, _pck_ca_cert, pck_ca_crl = get_pck_cert_crl(pccs_url, ca)
 
-    return tcb_info, tcb_cert, root_ca_crl, pck_ca_crl
+    if _root_ca_cert != root_ca_cert:
+        raise CertificateError("PCCS returned different Intel SGX Root CA")
+    if _pck_ca_cert != pck_ca_cert:
+        raise CertificateError(
+            "PCCS returned different Intel SGX PCK Platform/Processor CA"
+        )
+
+    tcb_info, _root_ca_cert, tcb_cert = get_tcbinfo(pccs_url, fmspc)
+
+    if _root_ca_cert != root_ca_cert:
+        raise CertificateError("PCCS returned different Intel SGX Root CA")
+
+    qe_identity, _root_ca_cert, _tcb_cert = get_qe_identity(pccs_url)
+
+    if _root_ca_cert != root_ca_cert:
+        raise CertificateError("PCCS returned different Intel SGX Root CA")
+
+    if _tcb_cert != tcb_cert:
+        raise CertificateError(
+            "PCCS returned different Intel SGX TCB signing certificate"
+        )
+
+    return tcb_info, qe_identity, tcb_cert, root_ca_crl, pck_ca_crl
 
 
 def verify_quote(
@@ -187,14 +273,35 @@ def verify_quote(
     collaterals: Optional[
         Tuple[
             bytes,
+            bytes,
             x509.Certificate,
             x509.CertificateRevocationList,
             x509.CertificateRevocationList,
         ]
     ] = None,
     pccs_url: Optional[str] = None,
-):
-    """Process DCAP remote attestation with `quote`."""
+) -> bool:
+    """Intel DCAP remote attestation from `quote`.
+
+    Parameters
+    ----------
+    quote : Union[Quote, bytes]
+        Intel SGX quote to verify.
+    collaterals : Tuple[bytes,
+                        bytes,
+                        x509.Certificate,
+                        x509.CertificateRevocationList,
+                        x509.CertificateRevocationList]
+        5-tuple (tcb_info, qe_identity, tcb_cert, root_ca_crl, pck_ca_crl).
+    pccs_url : str
+        URL of the PCCS.
+
+    Returns
+    -------
+    bool
+        True if success, raise otherwise.
+
+    """
     quote = cast(Quote, Quote.from_bytes(quote) if isinstance(quote, bytes) else quote)
 
     # If set, then the enclave is in debug mode
@@ -210,15 +317,20 @@ def verify_quote(
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
 
     tcb_info: bytes
+    _qe_identity: bytes
     tcb_cert: x509.Certificate
     root_ca_crl: x509.CertificateRevocationList
     pck_ca_crl: x509.CertificateRevocationList
     if pccs_url is not None:
-        tcb_info, tcb_cert, root_ca_crl, pck_ca_crl = retrieve_collaterals(
-            quote, pccs_url
-        )
+        (
+            tcb_info,
+            _qe_identity,
+            tcb_cert,
+            root_ca_crl,
+            pck_ca_crl,
+        ) = retrieve_collaterals(quote, pccs_url)
     elif collaterals is not None:
-        tcb_info, tcb_cert, root_ca_crl, pck_ca_crl = collaterals
+        (tcb_info, _qe_identity, tcb_cert, root_ca_crl, pck_ca_crl) = collaterals
     else:
         raise CollateralsError("Collaterals or PCCS URL missing")
 
@@ -274,3 +386,5 @@ def verify_quote(
         raise SGXVerificationError("Unexpected REPORTDATA in QE report")
 
     logging.info("%s QE report signature", globs.OK)
+
+    return True
