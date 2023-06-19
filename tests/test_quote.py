@@ -22,11 +22,11 @@ def test_quote_parsing(data_path):
     assert not others  # only 3 certificates
 
 
-def test_quote_ra(data_path):
+def test_quote_ra(data_path, pccs_url):
     raw_quote: bytes = (data_path / "quote.dat").read_bytes()
     quote: Quote = Quote.from_bytes(raw_quote)
 
-    verify_quote(quote, pccs_url="https://pccs.mse.cosmian.com")
+    verify_quote(quote=quote, pccs_url=pccs_url)
 
 
 def test_pck_extension(data_path):
