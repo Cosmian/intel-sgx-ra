@@ -7,7 +7,7 @@ build-backend = "maturin"
 
 [project]
 name = "intel-sgx-ra"
-version = "2.0a9"
+version = "2.0a10"
 description = "Intel SGX Remote Attestation verification library"
 authors = [
     {name = "Cosmian Tech", email = "tech@cosmian.com"},
