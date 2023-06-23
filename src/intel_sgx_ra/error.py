@@ -25,6 +25,10 @@ class PCCSResponseError(Exception):
     """Intel PCCS API reponse error."""
 
 
+class MAAServiceError(Exception):
+    """Microsoft Azure Attestation Service error."""
+
+
 class CommandNotFound(Exception):
     """CLI command error."""
 

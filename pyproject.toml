@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "requests>=2.31.0,<3.0.0",
     "cryptography>=41.0.1,<42.0.0",
+    "authlib>=1.2.0,<2.0.0"
 ]
 
 [project.optional-dependencies]
@@ -64,3 +65,7 @@ profile = "black"
 [tool.pytest]
 testpaths = "tests"
 pythonpath = "src"
+
+[[tool.mypy.overrides]]
+module = "authlib.*"
+ignore_missing_imports = true
