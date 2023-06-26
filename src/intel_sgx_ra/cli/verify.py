@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import os
 import sys
 import traceback
 from pathlib import Path
@@ -17,34 +16,58 @@ from intel_sgx_ra.error import (
     SGXDebugModeError,
     SGXQuoteNotFound,
 )
+from intel_sgx_ra.maa.attest import verify_quote as azure_verify_quote
 from intel_sgx_ra.quote import Quote
 from intel_sgx_ra.ratls import ratls_verify, ratls_verify_from_url
-
-PCCS_URL: str = os.getenv("PCCS_URL", "https://pccs.mse.cosmian.com")
 
 
 def parse_args() -> argparse.Namespace:
     """CLI argument parser."""
-    parser = argparse.ArgumentParser(description="Intel SGX DCAP Quote verification")
+    parser = argparse.ArgumentParser(description="Intel SGX DCAP quote verification")
     parser.add_argument("--verbose", action="store_true", help="Verbose mode")
     parser.add_argument(
-        "--mrenclave", type=str, help="Expected MRENCLAVE value in SGX quote"
+        "--mrenclave",
+        metavar="HEXDIGEST",
+        type=str,
+        help="Expected MRENCLAVE value in SGX quote",
     )
     parser.add_argument(
-        "--mrsigner", type=str, help="Expected MRSIGNER value in SGX quote"
+        "--mrsigner",
+        metavar="HEXDIGEST",
+        type=str,
+        help="Expected MRSIGNER value in SGX quote",
+    )
+
+    ra_type_group = parser.add_mutually_exclusive_group(required=True)
+    ra_type_group.add_argument(
+        "--pccs-url",
+        metavar="URL",
+        type=str,
+        help="Provisioning Certificate Cache Service URL (Intel DCAP)",
+    )
+    ra_type_group.add_argument(
+        "--azure-attestation",
+        action="store_true",
+        help="Microsoft Azure Attestation Service (Azure DCAP)",
     )
 
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
 
     cert_parser = subparsers.add_parser(
-        "certificate", help="Remote Attestation from X.509 certificate used for RA-TLS"
+        "certificate", help="Remote Attestation from RA-TLS X.509 certificate"
     )
-    group = cert_parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        "--path", type=Path, help="Path to X.509 certificate used for RA-TLS"
+    cert_source_type = cert_parser.add_mutually_exclusive_group(required=True)
+    cert_source_type.add_argument(
+        "--path",
+        metavar="FILE",
+        type=Path,
+        help="Path to RA-TLS X.509 certificate",
     )
-    group.add_argument(
-        "--url", type=str, help="HTTPS URL to fetch X.509 certificate used for RA-TLS"
+    cert_source_type.add_argument(
+        "--url",
+        metavar="URL",
+        type=str,
+        help="HTTPS URL to fetch server's certificate",
     )
 
     quote_parser = subparsers.add_parser(
@@ -75,7 +98,12 @@ def run() -> None:
         raise CommandNotFound("Bad subcommand!")
 
     try:
-        verify_quote(quote=quote, pccs_url=PCCS_URL)
+        if args.pccs_url:
+            verify_quote(quote=quote, pccs_url=args.pccs_url)
+        if args.azure_attestation:
+            maa_service_output = azure_verify_quote(quote)
+            logging.info(maa_service_output)
+
     except SGXQuoteNotFound:
         traceback.print_exc()
         sys.exit(1)
