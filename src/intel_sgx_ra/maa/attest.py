@@ -1,5 +1,8 @@
 """intel_sgx_ra.maa.attest module."""
 
+import json
+import logging
+from pprint import pformat
 from typing import Any, Dict, Optional, Union, cast
 
 import requests
@@ -7,8 +10,9 @@ from authlib.jose import JsonWebSignature
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
+from intel_sgx_ra import globs
 from intel_sgx_ra.base64url import base64url_decode, base64url_encode
-from intel_sgx_ra.error import MAAServiceError
+from intel_sgx_ra.error import MAAServiceError, SGXDebugModeError, SGXVerificationError
 from intel_sgx_ra.quote import Quote
 
 
@@ -116,12 +120,32 @@ def verify_quote(
     Returns
     -------
     Dict[str, Any]
-        JSON response of the MAA service API.
+        Payload of the JSON response from the MAA service API.
 
     """
     quote = cast(Quote, Quote.from_bytes(quote) if isinstance(quote, bytes) else quote)
 
     token: str = maa_attest(bytes(quote), enclave_held_data)["token"]
     jwks: Dict[str, Any] = maa_certificates()
+    response: Dict[str, Any] = verify_jws(token, jwks)
 
-    return verify_jws(token, jwks)
+    if "payload" not in response:
+        logging.info("%s Microsoft Azure Attestation service response", globs.FAIL)
+        raise MAAServiceError(f"Unexpected response from MAA service: {response}")
+
+    payload: Dict[str, Any] = json.loads(response["payload"])
+
+    logging.info("%s Microsoft Azure Attestation service response", globs.OK)
+    logging.debug(pformat(payload))
+
+    if payload["x-ms-attestation-type"] != "sgx":
+        raise SGXVerificationError
+
+    debug: bool = payload["x-ms-sgx-is-debuggable"]
+
+    logging.info("%s No SGX debug mode", globs.FAIL if debug else globs.OK)
+
+    if debug:
+        raise SGXDebugModeError
+
+    return payload

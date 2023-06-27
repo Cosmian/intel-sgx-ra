@@ -155,7 +155,8 @@ def ratls_verify(ratls_cert: Union[str, bytes, Path, x509.Certificate]) -> Quote
     success: bool = hashlib.sha256(pk).digest() == quote.report_body.report_data[:32]
 
     logging.info(
-        "%s RA-TLS public key fingerprint", globs.OK if success else globs.FAIL
+        "%s RA-TLS verification of public key fingerprint",
+        globs.OK if success else globs.FAIL,
     )
 
     if not success:

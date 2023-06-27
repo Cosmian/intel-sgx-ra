@@ -81,8 +81,10 @@ def parse_args() -> argparse.Namespace:
 # pylint: disable=too-many-branches
 def run() -> None:
     """Entrypoint of the CLI."""
-    logging.basicConfig(format="%(message)s", level=logging.INFO)
     args = parse_args()
+    logging.basicConfig(
+        format="%(message)s", level=logging.DEBUG if args.verbose else logging.INFO
+    )
 
     quote: Quote
 
@@ -101,8 +103,7 @@ def run() -> None:
         if args.pccs_url:
             verify_quote(quote=quote, pccs_url=args.pccs_url)
         if args.azure_attestation:
-            maa_service_output = azure_verify_quote(quote)
-            logging.info(maa_service_output)
+            azure_verify_quote(quote)
 
     except SGXQuoteNotFound:
         traceback.print_exc()
@@ -131,7 +132,6 @@ def run() -> None:
             logging.info("%s MRSIGNER matches expected value", globs.FAIL)
             sys.exit(6)
 
-    if args.verbose:
-        logging.info(pformat(quote.to_dict()))
+    logging.debug(pformat(quote.to_dict()))
 
     sys.exit(0)
