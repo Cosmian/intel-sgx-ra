@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        python-version: ["3.8"]
+        target: [x86_64]
+        python-version: ['3.8']
     steps:
       - uses: actions/checkout@v3
 
@@ -26,7 +27,75 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          command: build
+          target: ${{ matrix.target }}
+          args: --release --out dist -i ${{ matrix.python-version }}
+          sccache: 'true'
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade setuptools pip
+          if [ -f tests/requirements.txt ]; then pip install -r tests/requirements.txt; fi
+          pip install dist/*.whl
+
+      - name: Package metadata
+        id: metadata
+        run: |
+          export PACKAGE_VERSION=$(pip inspect | jq -r '.installed | .[] | select(.metadata.name == "intel-sgx-ra") | .metadata.version')
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Code format with black
+        run: |
+          python -m black --check $PYTHON_SRC
+
+      - name: Import check with isort
+        run: |
+          python -m isort --check --diff $PYTHON_SRC
+
+      - name: Lint check with pylint
+        run: |
+          python -m pylint $PYTHON_SRC
+
+      - name: Lint check with pycodestyle
+        run: |
+          python -m pycodestyle --max-line-length=90 --ignore=E203,W503 $PYTHON_SRC
+
+      - name: Lint check with pydocstyle
+        run: |
+          python -m pydocstyle $PYTHON_SRC
+
+      - name: Typecheck with MyPy
+        run: |
+          python -m mypy $PYTHON_SRC
+
+      - name: Test with pytest
+        run: |
+          python -m pytest
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [x86_64]
+        python-version: ['3.8']
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'  # caching pip dependencies
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
           args: --release --out dist -i ${{ matrix.python-version }}
           sccache: 'true'
 
@@ -80,7 +149,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: linux
+    needs: [linux, macos]
     steps:
       - uses: actions/download-artifact@v3
         with:
