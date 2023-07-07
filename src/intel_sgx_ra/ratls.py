@@ -25,16 +25,16 @@ SGX_QUOTE_EXTENSION_OID = x509.ObjectIdentifier("1.2.840.113741.1337.6")
 def url_parse(url: str) -> Tuple[str, int]:
     """Parse `url` and output 2-tuple (host, port).
 
-    Parameters
-    ----------
-    url : str
-        URL string of the form:
-        <scheme>://<netloc>/<path>;<params>?<query>#<fragment>.
-.
-    Returns
-    -------
-    Tuple[str, int]
-        2-tuple (host, port) parsed from `url`.
+        Parameters
+        ----------
+        url : str
+            URL string of the form:
+            <scheme>://<netloc>/<path>;<params>?<query>#<fragment>.
+    .
+        Returns
+        -------
+        Tuple[str, int]
+            2-tuple (host, port) parsed from `url`.
 
     """
     result: ParseResult = urlparse(url)

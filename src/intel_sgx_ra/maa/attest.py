@@ -16,7 +16,11 @@ from intel_sgx_ra.error import MAAServiceError, SGXDebugModeError, SGXVerificati
 from intel_sgx_ra.quote import Quote
 
 
-def maa_attest(quote: bytes, enclave_held_data: Optional[bytes]) -> Dict[str, Any]:
+def maa_attest(
+    quote: bytes,
+    enclave_held_data: Optional[bytes],
+    base_url: str = "https://sharedneu.neu.attest.azure.net",
+) -> Dict[str, Any]:
     """Attest SGX enclave request to Microsoft Azure Attestation (MAA) service API.
 
     Parameters
@@ -25,6 +29,8 @@ def maa_attest(quote: bytes, enclave_held_data: Optional[bytes]) -> Dict[str, An
         Intel SGX quote.
     enclave_held_data : Optional[bytes]
         Expected data in the report data section of Intel SGX quote.
+    base_url : str
+        Base URL of the attestation instance using MAA service.
 
     Returns
     -------
@@ -44,7 +50,7 @@ def maa_attest(quote: bytes, enclave_held_data: Optional[bytes]) -> Dict[str, An
         }
 
     response = requests.post(
-        url="https://sharedneu.neu.attest.azure.net/attest/SgxEnclave",
+        url=f"{base_url}/attest/SgxEnclave",
         params={"api-version": "2022-08-01"},
         json=payload,
         timeout=30,
@@ -55,8 +61,15 @@ def maa_attest(quote: bytes, enclave_held_data: Optional[bytes]) -> Dict[str, An
     return response.json()
 
 
-def maa_certificates() -> Dict[str, Any]:
+def maa_certificates(
+    base_url: str = "https://sharedneu.neu.attest.azure.net",
+) -> Dict[str, Any]:
     """Retrieve Microsoft certificates for Azure remote attestation.
+
+    Parameters
+    ----------
+    base_url : str
+        Base URL of the attestation instance using MAA service.
 
     Returns
     -------
@@ -64,9 +77,7 @@ def maa_certificates() -> Dict[str, Any]:
         JSON Web Key (JWK) set deserialized containing Microsoft certificates.
 
     """
-    response = requests.get(
-        url="https://sharedneu.neu.attest.azure.net/certs", timeout=30
-    )
+    response = requests.get(url=f"{base_url}/certs", timeout=30)
 
     return response.json()
 
@@ -106,7 +117,9 @@ def verify_jws(token: str, jwks: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def verify_quote(
-    quote: Union[Quote, bytes], enclave_held_data: Optional[bytes] = None
+    quote: Union[Quote, bytes],
+    enclave_held_data: Optional[bytes] = None,
+    base_url: str = "https://sharedneu.neu.attest.azure.net",
 ) -> Dict[str, Any]:
     """Azure remote attestation with Microsoft Azure Attestation (MAA) service.
 
@@ -116,6 +129,8 @@ def verify_quote(
         Intel SGX quote.
     enclave_held_data : Optional[bytes]
         Data in the user report data section of the Intel's quote.
+    base_url: str
+        Base URL of the attestation instance using MAA service.
 
     Returns
     -------
@@ -125,15 +140,15 @@ def verify_quote(
     """
     quote = cast(Quote, Quote.from_bytes(quote) if isinstance(quote, bytes) else quote)
 
-    token: str = maa_attest(bytes(quote), enclave_held_data)["token"]
-    jwks: Dict[str, Any] = maa_certificates()
-    response: Dict[str, Any] = verify_jws(token, jwks)
+    token: str = maa_attest(bytes(quote), enclave_held_data, base_url)["token"]
+    jwks: Dict[str, Any] = maa_certificates(base_url)
+    verified_token: Dict[str, Any] = verify_jws(token, jwks)
 
-    if "payload" not in response:
+    if "payload" not in verified_token:
         logging.info("%s Microsoft Azure Attestation service response", globs.FAIL)
-        raise MAAServiceError(f"Unexpected response from MAA service: {response}")
+        raise MAAServiceError(f"Unexpected response from MAA service: {verified_token}")
 
-    payload: Dict[str, Any] = json.loads(response["payload"])
+    payload: Dict[str, Any] = json.loads(verified_token["payload"])
 
     logging.info("%s Microsoft Azure Attestation service response", globs.OK)
     logging.debug(pformat(payload))
