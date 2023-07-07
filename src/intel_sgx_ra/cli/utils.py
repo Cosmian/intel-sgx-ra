@@ -18,15 +18,23 @@ def parse_args() -> argparse.Namespace:
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
 
     cert_parser = subparsers.add_parser(
-        "extract", help="Extract Quote from X.509 certificate using RA-TLS"
+        "extract", help="Extract Quote from RA-TLS X.509 certificate"
     )
-    cert_parser.add_argument("OUTPUT", type=Path, help="Output filepath to write Quote")
+    cert_parser.add_argument(
+        "OUTPUT", type=Path, help="Filepath to write Intel SGX quote"
+    )
     group = cert_parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "--path", type=Path, help="Path to X.509 certificate used for RA-TLS"
+        "--path",
+        metavar="FILE",
+        type=Path,
+        help="Path of the RA-TLS X.509 certificate",
     )
     group.add_argument(
-        "--url", type=str, help="HTTPS URL to fetch X.509 certificate used for RA-TLS"
+        "--url",
+        metavar="URL",
+        type=str,
+        help="HTTPS URL to fetch server's certificate",
     )
 
     return parser.parse_args()

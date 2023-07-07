@@ -1,10 +1,8 @@
-import re
-from typing import List
-
 from cryptography import x509
-from cryptography.hazmat.primitives.asymmetric import ec
 
-from intel_sgx_ra.quote import Quote, RE_CERT
+from intel_sgx_ra.quote import Quote
+from intel_sgx_ra.attest import verify_quote
+from intel_sgx_ra.pck import sgx_pck_extension_from_cert, SgxPckExtension
 
 
 def test_quote_parsing(data_path):
@@ -14,31 +12,29 @@ def test_quote_parsing(data_path):
     assert quote
     assert bytes(quote) == raw_quote
     assert quote.report_body.mr_signer == bytes.fromhex(
-        "c1c161d0dd996e8a9847de67ea2c00226761f7715a2c422d3012ac10795a1ef5")
+        "ac2c9fa87e4c91768b1d0c47169466c50d5a98c790639fbaefe7352a59919980")
 
-    raw_certs: List[bytes] = re.findall(RE_CERT, quote.signature)
     pck_cert, pck_platform_ca_cert, root_ca_cert, *others = [
         x509.load_pem_x509_certificate(raw_cert)
-        for raw_cert in raw_certs
+        for raw_cert in quote.certs()
     ]
 
     assert not others  # only 3 certificates
 
-    # 1) Check Intel Root CA self-signature
-    root_ca_cert.public_key().verify(
-        root_ca_cert.signature,
-        root_ca_cert.tbs_certificate_bytes,
-        ec.ECDSA(root_ca_cert.signature_hash_algorithm)
-    )
-    # 2) Check Intel PCK Platform CA signature by Intel Root CA
-    root_ca_cert.public_key().verify(
-        pck_platform_ca_cert.signature,
-        pck_platform_ca_cert.tbs_certificate_bytes,
-        ec.ECDSA(pck_platform_ca_cert.signature_hash_algorithm)
-    )
-    # 3) Check Intel PCK certificate signature by Intel PCK Platform CA
-    pck_platform_ca_cert.public_key().verify(
-        pck_cert.signature,
-        pck_cert.tbs_certificate_bytes,
-        ec.ECDSA(pck_cert.signature_hash_algorithm)
-    )
+
+def test_quote_ra(data_path, pccs_url):
+    raw_quote: bytes = (data_path / "quote.dat").read_bytes()
+    quote: Quote = Quote.from_bytes(raw_quote)
+
+    verify_quote(quote=quote, pccs_url=pccs_url)
+
+
+def test_pck_extension(data_path):
+    raw_pck_cert: bytes = (data_path / "pck_cert.pem").read_bytes()
+    pck_cert: x509.Certificate = x509.load_pem_x509_certificate(raw_pck_cert)
+
+    pck_extension: SgxPckExtension = sgx_pck_extension_from_cert(pck_cert)
+
+    assert "fmspc" in pck_extension
+    assert isinstance(pck_extension["fmspc"], bytes)
+    assert len(pck_extension["fmspc"]) == 6

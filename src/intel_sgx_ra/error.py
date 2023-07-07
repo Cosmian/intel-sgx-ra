@@ -5,8 +5,12 @@ class SGXQuoteNotFound(Exception):
     """SGX Quote extension not found in X509 certificate."""
 
 
+class SGXVerificationError(Exception):
+    """Error occured while verifying properties of SGX enclave."""
+
+
 class RATLSVerificationError(Exception):
-    """Cert public key different from report_data in SGX quote."""
+    """Certificate's public key different from report_data in SGX quote."""
 
 
 class SGXDebugModeError(Exception):
@@ -14,11 +18,15 @@ class SGXDebugModeError(Exception):
 
 
 class CertificateRevokedError(Exception):
-    """Intel Root CA revoked."""
+    """Certificate has been revoked."""
 
 
 class PCCSResponseError(Exception):
     """Intel PCCS API reponse error."""
+
+
+class MAAServiceError(Exception):
+    """Microsoft Azure Attestation Service error."""
 
 
 class CommandNotFound(Exception):
@@ -31,3 +39,7 @@ class CryptoKeyError(Exception):
 
 class CertificateError(Exception):
     """Server certificate error."""
+
+
+class CollateralsError(Exception):
+    """Collaterals are missing to verify quote."""
