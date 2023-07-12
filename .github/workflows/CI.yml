@@ -28,6 +28,8 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
+          manylinux: manylinux2014
+          container: quay.io/pypa/manylinux2014_x86_64
           args: --release --out dist -i ${{ matrix.python-version }}
           sccache: 'true'
 
