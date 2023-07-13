@@ -1,13 +1,10 @@
 [build-system]
-requires = [
-    "maturin>=1.0,<2.0",
-    "setuptools>=67.8.0,<68.0.0"
-]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "intel-sgx-ra"
-version = "2.0"
+version = "2.0.1"
 description = "Intel SGX Remote Attestation verification library"
 authors = [
     {name = "Cosmian Tech", email = "tech@cosmian.com"},
