@@ -5,7 +5,7 @@ import logging
 import socket
 import ssl
 from pathlib import Path
-from typing import Tuple, Union, cast
+from typing import List, Tuple, Union, cast
 from urllib.parse import ParseResult, urlparse
 
 from cryptography import x509
@@ -87,6 +87,67 @@ def get_server_certificate(
             if not cert:
                 raise CertificateError("Can't get peer certificate")
             return ssl.DER_cert_to_PEM_cert(cert)
+
+
+def get_server_certificate_chain(
+    addr: Tuple[str, int], ssl_version=ssl.PROTOCOL_TLS_CLIENT
+) -> List[str]:
+    """Get TLS certificate chain from `addr`.
+
+    Parameters
+    ----------
+    addr : Tuple[str, int]
+        2-tuple (host, port).
+    ssl_version : ssl._SSLMethod
+        SSL protocol version.
+
+    Returns
+    -------
+    List[str]
+        PEM certificate chain of the server.
+
+    Notes
+    -----
+    Requires Python 3.10.0
+
+    """
+    host, port = addr
+    with socket.create_connection((host, port), timeout=10) as sock:
+        context = ssl.SSLContext(ssl_version)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+        with context.wrap_socket(sock, server_hostname=host) as ssock:
+            certs = ssock._sslobj.get_unverified_chain()
+            if not certs:
+                raise CertificateError("Can't get certificate chain")
+            return [cert.public_bytes() for cert in certs]
+
+
+def get_root_certificate(
+    addr: Tuple[str, int], ssl_version=ssl.PROTOCOL_TLS_CLIENT
+) -> str:
+    """Get the root certificate.
+
+    Parameters
+    ----------
+    addr : Tuple[str, int]
+        2-tuple (host, port).
+    ssl_version : ssl._SSLMethod
+        SSL protocol version.
+
+    Returns
+    -------
+    str
+        PEM certificate of the server.
+
+    Notes
+    -----
+    Requires Python 3.10.0
+
+    """
+    certs = get_server_certificate_chain(addr, ssl_version)
+    return certs[-1]
 
 
 def get_quote_from_cert(ratls_cert: Union[bytes, x509.Certificate]) -> Quote:
