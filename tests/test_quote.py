@@ -35,6 +35,5 @@ def test_pck_extension(data_path):
 
     pck_extension: SgxPckExtension = sgx_pck_extension_from_cert(pck_cert)
 
-    assert "fmspc" in pck_extension
-    assert isinstance(pck_extension["fmspc"], bytes)
-    assert len(pck_extension["fmspc"]) == 6
+    assert isinstance(pck_extension.fmspc, bytes)
+    assert len(pck_extension.fmspc) == 6
