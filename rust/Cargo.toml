@@ -8,8 +8,5 @@ name = "lib_sgx_dcap_ratls"
 crate-type = ["cdylib"]
 
 [dependencies]
-sgx_pck_extension = "0.1"
-
-[dependencies.pyo3]
-version = "0.19"
-features = ["extension-module"]
+pyo3 = { version = "0.20", features = ["extension-module"] }
+sgx_pck_extension = "0.1.1"

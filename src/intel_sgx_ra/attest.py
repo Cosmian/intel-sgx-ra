@@ -226,7 +226,6 @@ def retrieve_collaterals(
     ]  # type: x509.Certificate, x509.Certificate, x509.Certificate
 
     sgx_pck_ext: SgxPckExtension = sgx_pck_extension_from_cert(pck_cert)
-    fmspc: bytes = sgx_pck_ext["fmspc"]
 
     common_name: x509.NameAttribute
     common_name, *_ = pck_ca_cert.subject.get_attributes_for_oid(
@@ -250,7 +249,7 @@ def retrieve_collaterals(
             "PCCS returned different Intel SGX PCK Platform/Processor CA"
         )
 
-    tcb_info, _root_ca_cert, tcb_cert = get_tcbinfo(pccs_url, fmspc)
+    tcb_info, _root_ca_cert, tcb_cert = get_tcbinfo(pccs_url, sgx_pck_ext.fmspc)
 
     if _root_ca_cert != root_ca_cert:
         raise CertificateError("PCCS returned different Intel SGX Root CA")
