@@ -1,0 +1,86 @@
+name: Python CI
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+
+env:
+  PYTHON_SRC: "src"
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ${{ inputs.os }}
+    strategy:
+      matrix:
+        target: [x86_64]
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    name: Python ${{ matrix.python-version }} (${{ matrix.target }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'  # caching pip dependencies
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: manylinux2014
+          container: quay.io/pypa/manylinux2014_x86_64
+          args: --release --out dist -i ${{ matrix.python-version }}
+          sccache: 'true'
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.os }}-${{ matrix.python-version }}-${{ matrix.target }}-wheels
+          path: dist
+
+      - name: Install dependencies
+        run: |
+          if [ -f tests/requirements.txt ]; then python -m pip install -r tests/requirements.txt; fi
+          python -m pip install dist/*.whl
+
+      - name: Package metadata
+        id: metadata
+        run: |
+          export PACKAGE_VERSION=$(pip inspect | jq -r '.installed | .[] | select(.metadata.name == "intel-sgx-ra") | .metadata.version')
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Code format with black
+        run: |
+          python -m black --check $PYTHON_SRC
+
+      - name: Import check with isort
+        run: |
+          python -m isort --check --diff $PYTHON_SRC
+
+      - name: Lint check with pylint
+        run: |
+          python -m pylint $PYTHON_SRC
+
+      - name: Lint check with pycodestyle
+        run: |
+          python -m pycodestyle --max-line-length=90 --ignore=E203,W503 $PYTHON_SRC
+
+      - name: Lint check with pydocstyle
+        run: |
+          python -m pydocstyle $PYTHON_SRC
+
+      - name: Typecheck with MyPy
+        run: |
+          python -m mypy $PYTHON_SRC
+
+      - name: Test with pytest
+        run: |
+          python -m pytest
