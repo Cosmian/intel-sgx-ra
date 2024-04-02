@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -8,7 +8,7 @@ from intel_sgx_ra.pccs import get_root_ca_crl, get_pck_cert_crl, get_qe_identity
 
 def test_root_ca(data_path, pccs_url):
     quote: Quote = Quote.from_bytes((data_path / "quote.dat").read_bytes())
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     _, _, root_ca_cert = [
         x509.load_pem_x509_certificate(raw_cert)
@@ -20,7 +20,7 @@ def test_root_ca(data_path, pccs_url):
         root_ca_cert.tbs_certificate_bytes,
         ec.ECDSA(root_ca_cert.signature_hash_algorithm),
     ) is None
-    assert root_ca_cert.not_valid_before <= now <= root_ca_cert.not_valid_after
+    assert root_ca_cert.not_valid_before_utc <= now <= root_ca_cert.not_valid_after_utc
 
     root_ca_crl = get_root_ca_crl(pccs_url)
 
@@ -30,7 +30,7 @@ def test_root_ca(data_path, pccs_url):
 
 def test_pck_ca(data_path, pccs_url):
     quote: Quote = Quote.from_bytes((data_path / "quote.dat").read_bytes())
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     _, pck_ca_cert, root_ca_cert = [
         x509.load_pem_x509_certificate(raw_cert)
@@ -43,7 +43,7 @@ def test_pck_ca(data_path, pccs_url):
         pck_ca_cert.tbs_certificate_bytes,
         ec.ECDSA(pck_ca_cert.signature_hash_algorithm),
     ) is None
-    assert pck_ca_cert.not_valid_before <= now <= pck_ca_cert.not_valid_after
+    assert pck_ca_cert.not_valid_before_utc <= now <= pck_ca_cert.not_valid_after_utc
 
     common_name, *_ = pck_ca_cert.subject.get_attributes_for_oid(
         x509.NameOID.COMMON_NAME
@@ -60,7 +60,7 @@ def test_pck_ca(data_path, pccs_url):
 
 def test_pck(data_path, pccs_url):
     quote: Quote = Quote.from_bytes((data_path / "quote.dat").read_bytes())
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     pck_cert, pck_ca_cert, root_ca_cert = [
         x509.load_pem_x509_certificate(raw_cert)
@@ -74,8 +74,8 @@ def test_pck(data_path, pccs_url):
         pck_cert.tbs_certificate_bytes,
         ec.ECDSA(pck_cert.signature_hash_algorithm),
     ) is None
-    assert pck_cert.not_valid_before <= now <= pck_cert.not_valid_after
+    assert pck_cert.not_valid_before_utc <= now <= pck_cert.not_valid_after_utc
 
     tcb_info, _root_ca_cert, tcb_cert = get_qe_identity(pccs_url)
     assert _root_ca_cert == root_ca_cert
-    assert tcb_cert.not_valid_before <= now <= tcb_cert.not_valid_after
+    assert tcb_cert.not_valid_before_utc <= now <= tcb_cert.not_valid_after_utc
