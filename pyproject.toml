@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "intel-sgx-ra"
-version = "2.1.0"
+version = "2.3.0"
 description = "Intel SGX Remote Attestation verification library"
 authors = [
     {name = "Cosmian Tech", email = "tech@cosmian.com"},
@@ -21,19 +21,19 @@ classifiers = [
 ]
 dependencies = [
     "requests>=2.31.0,<3.0.0",
-    "cryptography>=41.0.1,<42.0.0",
-    "authlib>=1.2.0,<2.0.0"
+    "cryptography>=42.0.5,<43.0.0",
+    "authlib>=1.3.0,<2.0.0"
 ]
 
 [project.optional-dependencies]
 tests = [
-    "pylint>=2.17.4,<3.0.0",
-    "pycodestyle>=2.10.0,<3.0.0",
+    "black>=24.3.0,<25.0.0",
+    "isort>=5.13.2,<6.0.0",
+    "pylint>=3.1.0,<4.0.0",
+    "pycodestyle>=2.11.1,<3.0.0",
     "pydocstyle>=6.3.0,<7.0.0",
-    "mypy>=1.3.0,<2.0.0",
-    "black>=23.3.0,<24.0.0",
-    "isort>=5.12.0,<6.0.0",
-    "pytest>=7.3.2,<8.0.0",
+    "mypy>=1.9.0,<2.0.0",
+    "pytest>=8.1.1,<9.0.0",
     "types-requests>=2.31.0,<3.0.0"
 ]
 

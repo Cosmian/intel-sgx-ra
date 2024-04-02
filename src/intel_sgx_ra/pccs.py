@@ -129,6 +129,9 @@ def get_tcbinfo(
         timeout=30,
     )
 
+    if response.status_code != HTTPStatus.OK:
+        raise PCCSResponseError(f"Unknown error, status code {response.status_code}")
+
     tcb_cert, root_ca_cert, *others = [
         x509.load_pem_x509_certificate(raw_cert)
         for raw_cert in re.findall(
@@ -168,6 +171,9 @@ def get_qe_identity(
     response = requests.get(
         url=f"{pccs_url}/sgx/certification/v4/qe/identity", timeout=30
     )
+
+    if response.status_code != HTTPStatus.OK:
+        raise PCCSResponseError(f"Unknown error, status code {response.status_code}")
 
     tcb_cert, root_ca_cert, *others = [
         x509.load_pem_x509_certificate(raw_cert)

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Dict, Literal, Optional, Tuple, Union, cast
 
@@ -61,7 +61,7 @@ def verify_pck_chain(
         True if success, raise exception otherwise.
 
     """
-    now: datetime = datetime.utcnow()
+    now: datetime = datetime.now(timezone.utc)
 
     pck_ca_pk, root_ca_pk = (
         cast(ec.EllipticCurvePublicKey, pck_ca_cert.public_key()),
@@ -74,11 +74,11 @@ def verify_pck_chain(
     pck_cert.verify_directly_issued_by(pck_ca_cert)
 
     # Check expiration date of certificates
-    if not root_ca_cert.not_valid_before <= now <= root_ca_cert.not_valid_after:
+    if not root_ca_cert.not_valid_before_utc <= now <= root_ca_cert.not_valid_after_utc:
         raise CertificateError("Intel Root CA certificate has expired")
-    if not pck_ca_cert.not_valid_before <= now <= pck_ca_cert.not_valid_after:
+    if not pck_ca_cert.not_valid_before_utc <= now <= pck_ca_cert.not_valid_after_utc:
         raise CertificateError("Intel PCK CA certificate has expired")
-    if not pck_cert.not_valid_before <= now <= pck_cert.not_valid_after:
+    if not pck_cert.not_valid_before_utc <= now <= pck_cert.not_valid_after_utc:
         raise CertificateError("Intel PCK certificate has expired")
 
     # Check Intel Root CA signed Intel Root CA CRL and not revoked
@@ -149,13 +149,17 @@ def verify_tcb(
     .. [1] https://api.portal.trustedservices.intel.com/documentation#pcs-tcb-info-model-v3
 
     """  # noqa: E501 # pylint: disable=line-too-long
-    now: datetime = datetime.utcnow()
+    now: datetime = datetime.now(timezone.utc)
 
     tcb: Dict[str, Any] = json.loads(tcb_info)
 
+    next_update: datetime = datetime.fromisoformat(
+        # replace zero designator Z for the zero UTC offset (not parsed in Python 3.8)
+        tcb["tcbInfo"]["nextUpdate"].replace("Z", "+00:00")
+    )
     assert tcb["tcbInfo"]["version"] == 3
     assert tcb["tcbInfo"]["id"] == "SGX"
-    assert now < datetime.strptime(tcb["tcbInfo"]["nextUpdate"], "%Y-%m-%dT%H:%M:%SZ")
+    assert now < next_update
 
     root_ca_pk = cast(ec.EllipticCurvePublicKey, root_ca_cert.public_key())
 
@@ -164,9 +168,9 @@ def verify_tcb(
     tcb_cert.verify_directly_issued_by(root_ca_cert)
 
     # Check expiration date of certificates
-    if not root_ca_cert.not_valid_before <= now <= root_ca_cert.not_valid_after:
+    if not root_ca_cert.not_valid_before_utc <= now <= root_ca_cert.not_valid_after_utc:
         raise CertificateError("Intel Root CA certificate has expired")
-    if not tcb_cert.not_valid_before <= now <= tcb_cert.not_valid_after:
+    if not tcb_cert.not_valid_before_utc <= now <= tcb_cert.not_valid_after_utc:
         raise CertificateError("Intel TCB certificate has expired")
 
     try:
