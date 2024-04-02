@@ -1,0 +1,32 @@
+name: Release CI
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+      python-version:
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Python ${{ inputs.python-version }} (${{ inputs.target }})
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://pypi.org/p/intel-sgx-ra
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.os }}-${{ inputs.python-version }}-${{ inputs.target }}-wheels
+          path: dist
+
+      - name: Publish packages to PyPi
+        uses: pypa/gh-action-pypi-publish@release/v1

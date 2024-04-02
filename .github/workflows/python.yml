@@ -12,6 +12,10 @@ on:
       python-version:
         required: true
         type: string
+    outputs:
+      package-version:
+        description: "Version of the Python package"
+        value: ${{ jobs.build.outputs.package-version }}
 
 env:
   PYTHON_SRC: "src"
@@ -20,9 +24,11 @@ permissions:
   contents: read
 
 jobs:
-  python:
+  build:
     name: Python ${{ inputs.python-version }} (${{ inputs.target }})
     runs-on: ${{ inputs.os }}
+    outputs:
+      package-version: ${{ steps.metadata.outputs.PACKAGE_VERSION }}
 
     steps:
       - name: Checkout
