@@ -18,15 +18,11 @@ env:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   python:
     name: Python ${{ inputs.python-version }} (${{ inputs.target }})
     runs-on: ${{ inputs.os }}
-    environment:
-      name: release
-      url: https://pypi.org/p/intel-sgx-ra
 
     steps:
       - name: Checkout
