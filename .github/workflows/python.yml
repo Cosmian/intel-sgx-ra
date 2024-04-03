@@ -6,6 +6,16 @@ on:
       os:
         required: true
         type: string
+      target:
+        required: true
+        type: string
+      python-version:
+        required: true
+        type: string
+    outputs:
+      package-version:
+        description: "Version of the Python package"
+        value: ${{ jobs.build.outputs.package-version }}
 
 env:
   PYTHON_SRC: "src"
@@ -14,37 +24,30 @@ permissions:
   contents: read
 
 jobs:
-  python:
+  build:
+    name: Python ${{ inputs.python-version }} (${{ inputs.target }})
     runs-on: ${{ inputs.os }}
-    strategy:
-      matrix:
-        target: [x86_64]
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-    name: Python ${{ matrix.python-version }} (${{ matrix.target }})
+    outputs:
+      package-version: ${{ steps.metadata.outputs.PACKAGE_VERSION }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ inputs.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ inputs.python-version }}
           cache: 'pip'  # caching pip dependencies
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
+          target: ${{ inputs.target }}
           manylinux: manylinux2014
           container: quay.io/pypa/manylinux2014_x86_64
-          args: --release --out dist -i ${{ matrix.python-version }}
+          args: --release --out dist -i ${{ inputs.python-version }}
           sccache: 'true'
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.os }}-${{ matrix.python-version }}-${{ matrix.target }}-wheels
-          path: dist
 
       - name: Install dependencies
         run: |
@@ -84,3 +87,9 @@ jobs:
       - name: Test with pytest
         run: |
           python -m pytest
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.os }}-${{ inputs.python-version }}-${{ inputs.target }}-wheels
+          path: dist

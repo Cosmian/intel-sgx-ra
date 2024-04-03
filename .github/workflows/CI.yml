@@ -2,35 +2,40 @@ name: CI
 
 on: [push]
 
-env:
-  PYTHON_SRC: "src"
-
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   python:
+    uses: ./.github/workflows/python.yml
+    with:
+      os: ${{ matrix.os }}
+      target: ${{ matrix.target }}
+      python-version: ${{ matrix.python-version }}
+    name: Python CI (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-20.04, macos-13]
-    uses: ./.github/workflows/python.yml
-    name: Python CI (${{ matrix.os }})
-    with:
-      os: ${{ matrix.os }}
+        target: [x86_64]
+        python-version: ['3.8', '3.9', '3.10', '3.11']      
 
   release:
-    name: Release
-    runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
     needs: python
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-      - name: Publish to PyPI
-        uses: PyO3/maturin-action@v1
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        with:
-          command: upload
-          args: --skip-existing *
+    uses: ./.github/workflows/pypi_release.yml
+    with:
+      os: ${{ matrix.os }}
+      target: ${{ matrix.target }}
+      python-version: ${{ matrix.python-version }}
+    name: Release (${{ matrix.os }})
+    if: startsWith(github.ref, 'refs/tags/')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, macos-13]
+        target: [x86_64]
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    permissions:
+      contents: read
+      id-token: write
