@@ -132,11 +132,14 @@ def get_tcbinfo(
     if response.status_code != HTTPStatus.OK:
         raise PCCSResponseError(f"Unknown error, status code {response.status_code}")
 
+    tcb_issuer_chain: str = unquote(
+        response.headers.get("TCB-Info-Issuer-Chain", "")  # v4
+        or response.headers.get("SGX-TCB-Info-Issuer-Chain", "")  # v3
+    )
+
     tcb_cert, root_ca_cert, *others = [
         x509.load_pem_x509_certificate(raw_cert)
-        for raw_cert in re.findall(
-            RE_CERT, unquote(response.headers["TCB-Info-Issuer-Chain"]).encode("ascii")
-        )
+        for raw_cert in re.findall(RE_CERT, tcb_issuer_chain.encode("ascii"))
     ]
 
     if others:
