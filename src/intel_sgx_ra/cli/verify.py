@@ -82,9 +82,7 @@ def parse_args() -> argparse.Namespace:
 def run() -> None:
     """Entrypoint of the CLI."""
     args = parse_args()
-    logging.basicConfig(
-        format="%(message)s", level=logging.DEBUG if args.verbose else logging.INFO
-    )
+    logging.basicConfig(format="%(message)s", level=logging.INFO)
 
     quote: Quote
 
