@@ -159,7 +159,11 @@ def verify_tcb(
     )
     assert tcb["tcbInfo"]["version"] == 3
     assert tcb["tcbInfo"]["id"] == "SGX"
-    assert now < next_update
+
+    if next_update < now:
+        # should raise an exception but collaterals are outdated on Microsoft Azure:
+        # see https://github.com/microsoft/Azure-DCAP-Client/issues/154
+        logging.error("%s TCB info outdated: %s", globs.FAIL, next_update)
 
     root_ca_pk = cast(ec.EllipticCurvePublicKey, root_ca_cert.public_key())
 
@@ -187,10 +191,10 @@ def verify_tcb(
             ec.ECDSA(cast(HashAlgorithm, tcb_cert.signature_hash_algorithm)),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("%s TCB verification", globs.FAIL)
+        logging.info("%s TCB signature", globs.FAIL)
         raise exc
 
-    logging.info("%s TCB verification", globs.OK)
+    logging.info("%s TCB signature", globs.OK)
 
     return True
 
