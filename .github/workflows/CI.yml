@@ -17,9 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, macos-13]
+        os: [ubuntu-20.04, ubuntu-22.04, macos-13]
         target: [x86_64]
-        python-version: ['3.8', '3.9', '3.10', '3.11']      
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
 
   release:
     needs: python
@@ -33,9 +33,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, macos-13]
+        os: [ubuntu-20.04, ubuntu-22.04, macos-13]
         target: [x86_64]
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
     permissions:
       contents: read
       id-token: write

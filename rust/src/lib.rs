@@ -1,4 +1,5 @@
-use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
+use pyo3::prelude::*;
+use pyo3::{exceptions::PyException, types::PyBytes};
 use sgx_pck_extension::extension::SgxPckExtension;
 
 #[derive(Clone)]
@@ -31,26 +32,31 @@ pub struct PySgxPckExtension {
 impl From<SgxPckExtension> for PySgxPckExtension {
     fn from(sgx_pck_extension: SgxPckExtension) -> PySgxPckExtension {
         let ppid: Py<PyBytes> =
-            Python::with_gil(|py| PyBytes::new(py, sgx_pck_extension.ppid.as_slice()).into());
+            Python::with_gil(|py| PyBytes::new_bound(py, sgx_pck_extension.ppid.as_slice()).into());
 
         let compsvn: Py<PyBytes> = Python::with_gil(|py| {
-            PyBytes::new(py, sgx_pck_extension.tcb.compsvn.as_slice()).into()
+            PyBytes::new_bound(py, sgx_pck_extension.tcb.compsvn.as_slice()).into()
         });
 
-        let cpusvn: Py<PyBytes> =
-            Python::with_gil(|py| PyBytes::new(py, sgx_pck_extension.tcb.cpusvn.as_slice()).into());
+        let cpusvn: Py<PyBytes> = Python::with_gil(|py| {
+            PyBytes::new_bound(py, sgx_pck_extension.tcb.cpusvn.as_slice()).into()
+        });
 
-        let pceid: Py<PyBytes> =
-            Python::with_gil(|py| PyBytes::new(py, sgx_pck_extension.pceid.as_slice()).into());
+        let pceid: Py<PyBytes> = Python::with_gil(|py| {
+            PyBytes::new_bound(py, sgx_pck_extension.pceid.as_slice()).into()
+        });
 
-        let fmspc: Py<PyBytes> =
-            Python::with_gil(|py| PyBytes::new(py, sgx_pck_extension.fmspc.as_slice()).into());
+        let fmspc: Py<PyBytes> = Python::with_gil(|py| {
+            PyBytes::new_bound(py, sgx_pck_extension.fmspc.as_slice()).into()
+        });
 
         let platform_instance_id: Option<Py<PyBytes>> =
             sgx_pck_extension
                 .platform_instance_id
                 .map(|platform_instance_id| {
-                    Python::with_gil(|py| PyBytes::new(py, platform_instance_id.as_slice()).into())
+                    Python::with_gil(|py| {
+                        PyBytes::new_bound(py, platform_instance_id.as_slice()).into()
+                    })
                 });
 
         PySgxPckExtension {
@@ -85,7 +91,7 @@ fn sgx_pck_extension_from_pem(_py: Python<'_>, pem: &[u8]) -> PyResult<PySgxPckE
 
 #[pymodule]
 #[pyo3(name = "lib_sgx_dcap_ratls")]
-fn sgx_dcap_ratls(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn sgx_dcap_ratls(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTcb>()?;
     m.add_class::<PyConfiguration>()?;
     m.add_class::<PySgxPckExtension>()?;
