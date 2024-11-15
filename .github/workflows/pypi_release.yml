@@ -30,3 +30,5 @@ jobs:
 
       - name: Publish packages to PyPi
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: false
