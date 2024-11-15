@@ -70,7 +70,7 @@ jobs:
 
       - name: Lint check with pylint
         run: |
-          python -m pylint $PYTHON_SRC
+          python -m pylint --ignore-patterns=".*.pyi" $PYTHON_SRC
 
       - name: Lint check with pycodestyle
         run: |
