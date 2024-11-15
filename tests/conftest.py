@@ -10,4 +10,4 @@ def data_path():
 
 @pytest.fixture(scope="module")
 def pccs_url():
-    return "https://pccs.staging.mse.cosmian.com"
+    return "https://pccs.cosmian.com"
