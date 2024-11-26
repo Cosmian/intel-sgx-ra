@@ -1,7 +1,6 @@
 """intel_sgx_ra.ratls module."""
 
 import hashlib
-import logging
 import socket
 import ssl
 from pathlib import Path
@@ -17,6 +16,7 @@ from intel_sgx_ra.error import (
     RATLSVerificationError,
     SGXQuoteNotFound,
 )
+from intel_sgx_ra.log import LOGGER
 from intel_sgx_ra.quote import Quote
 
 SGX_QUOTE_EXTENSION_OID = x509.ObjectIdentifier("1.2.840.113741.1337.6")
@@ -154,7 +154,7 @@ def ratls_verify(ratls_cert: Union[str, bytes, Path, x509.Certificate]) -> Quote
     )
     success: bool = hashlib.sha256(pk).digest() == quote.report_body.report_data[:32]
 
-    logging.info(
+    LOGGER.info(
         "%s RA-TLS verification of public key fingerprint",
         globs.OK if success else globs.FAIL,
     )

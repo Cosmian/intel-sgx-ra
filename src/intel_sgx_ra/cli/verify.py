@@ -16,6 +16,7 @@ from intel_sgx_ra.error import (
     SGXDebugModeError,
     SGXQuoteNotFound,
 )
+from intel_sgx_ra.log import LOGGER
 from intel_sgx_ra.maa.attest import verify_quote as azure_verify_quote
 from intel_sgx_ra.quote import Quote
 from intel_sgx_ra.ratls import ratls_verify, ratls_verify_from_url
@@ -118,18 +119,18 @@ def run() -> None:
 
     if args.mrenclave:
         if quote.report_body.mr_enclave == bytes.fromhex(args.mrenclave):
-            logging.info("%s MRENCLAVE matches expected value", globs.OK)
+            LOGGER.info("%s MRENCLAVE matches expected value", globs.OK)
         else:
-            logging.info("%s MRENCLAVE matches expected value", globs.FAIL)
+            LOGGER.info("%s MRENCLAVE matches expected value", globs.FAIL)
             sys.exit(5)
 
     if args.mrsigner:
         if quote.report_body.mr_signer == bytes.fromhex(args.mrsigner):
-            logging.info("%s MRSIGNER matches expected value", globs.OK)
+            LOGGER.info("%s MRSIGNER matches expected value", globs.OK)
         else:
-            logging.info("%s MRSIGNER matches expected value", globs.FAIL)
+            LOGGER.info("%s MRSIGNER matches expected value", globs.FAIL)
             sys.exit(6)
 
-    logging.debug(pformat(quote.to_dict()))
+    LOGGER.debug(pformat(quote.to_dict()))
 
     sys.exit(0)

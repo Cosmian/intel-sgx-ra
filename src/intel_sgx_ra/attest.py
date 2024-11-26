@@ -1,7 +1,6 @@
 """intel_ra_sgx.attest module."""
 
 import json
-import logging
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Dict, Literal, Optional, Tuple, Union, cast
@@ -20,6 +19,7 @@ from intel_sgx_ra.error import (
     SGXDebugModeError,
     SGXVerificationError,
 )
+from intel_sgx_ra.log import LOGGER
 from intel_sgx_ra.pccs import (
     get_pck_cert_crl,
     get_qe_identity,
@@ -86,7 +86,7 @@ def verify_pck_chain(
         raise CertificateError("Invalid Intel Root CA CRL signature")
 
     if root_ca_crl.get_revoked_certificate_by_serial_number(root_ca_cert.serial_number):
-        logging.info("%s Check Intel Root CA certificate against CRL", globs.FAIL)
+        LOGGER.info("%s Check Intel Root CA certificate against CRL", globs.FAIL)
         raise CertificateRevokedError("Intel Root CA certificate revoked")
 
     # Check Intel PCK Platform/Processor signed Intel PCK CRL and not revoked
@@ -94,7 +94,7 @@ def verify_pck_chain(
         raise CertificateError("Invalid Intel PCK CA CRL signature")
 
     if pck_ca_crl.get_revoked_certificate_by_serial_number(pck_ca_cert.serial_number):
-        logging.info("%s Check Intel PCK CA certificate against CRL", globs.FAIL)
+        LOGGER.info("%s Check Intel PCK CA certificate against CRL", globs.FAIL)
         raise CertificateRevokedError("Intel PCK CA certificate revoked")
 
     try:
@@ -117,10 +117,10 @@ def verify_pck_chain(
             ec.ECDSA(cast(HashAlgorithm, pck_cert.signature_hash_algorithm)),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("%s Certification chain", globs.FAIL)
+        LOGGER.info("%s Certification chain", globs.FAIL)
         raise exc
 
-    logging.info("%s Certification chain", globs.OK)
+    LOGGER.info("%s Certification chain", globs.OK)
 
     return True
 
@@ -163,7 +163,7 @@ def verify_tcb(
     if next_update < now:
         # should raise an exception but collaterals are outdated on Microsoft Azure:
         # see https://github.com/microsoft/Azure-DCAP-Client/issues/154
-        logging.error("%s TCB info outdated: %s", globs.FAIL, next_update)
+        LOGGER.error("%s TCB info outdated: %s", globs.FAIL, next_update)
 
     root_ca_pk = cast(ec.EllipticCurvePublicKey, root_ca_cert.public_key())
 
@@ -191,10 +191,10 @@ def verify_tcb(
             ec.ECDSA(cast(HashAlgorithm, tcb_cert.signature_hash_algorithm)),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("%s TCB signature", globs.FAIL)
+        LOGGER.info("%s TCB signature", globs.FAIL)
         raise exc
 
-    logging.info("%s TCB signature", globs.OK)
+    LOGGER.info("%s TCB signature", globs.OK)
 
     return True
 
@@ -314,7 +314,7 @@ def verify_quote(
     # If set, then the enclave is in debug mode
     debug: bool = bool(quote.report_body.flags & SGX_FLAGS_DEBUG)
 
-    logging.info("%s No SGX debug mode", globs.FAIL if debug else globs.OK)
+    LOGGER.info("%s No SGX debug mode", globs.FAIL if debug else globs.OK)
 
     if debug:
         raise SGXDebugModeError
@@ -362,10 +362,10 @@ def verify_quote(
             signature_algorithm=ec.ECDSA(SHA256()),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("%s Quote signature", globs.FAIL)
+        LOGGER.info("%s Quote signature", globs.FAIL)
         raise exc
 
-    logging.info("%s Quote signature", globs.OK)
+    LOGGER.info("%s Quote signature", globs.OK)
 
     try:
         pck_pk = cast(ec.EllipticCurvePublicKey, pck_cert.public_key())
@@ -382,7 +382,7 @@ def verify_quote(
             signature_algorithm=ec.ECDSA(SHA256()),
         )
     except cryptography.exceptions.InvalidSignature as exc:
-        logging.info("%s QE report signature", globs.FAIL)
+        LOGGER.info("%s QE report signature", globs.FAIL)
         raise exc
 
     expected_qe_report_data: bytes = sha256(
@@ -392,6 +392,6 @@ def verify_quote(
     if quote.auth_data.qe_report.report_data[:32] != expected_qe_report_data:
         raise SGXVerificationError("Unexpected REPORTDATA in QE report")
 
-    logging.info("%s QE report signature", globs.OK)
+    LOGGER.info("%s QE report signature", globs.OK)
 
     return True
