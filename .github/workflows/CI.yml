@@ -10,31 +10,38 @@ jobs:
   python:
     uses: ./.github/workflows/python.yml
     with:
-      os: ${{ matrix.os }}
-      target: ${{ matrix.target }}
+      os: ${{ matrix.targets.os }}
+      target: ${{ matrix.targets.target }}
       python-version: ${{ matrix.python-version }}
-    name: Python CI (${{ matrix.os }})
+    name: Python CI (${{ matrix.targets.os }} ${{ matrix.targets.target }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, macos-13]
-        target: [x86_64]
+        targets: [
+          {os: ubuntu-20.04, target: x86_64},
+          {os: ubuntu-22.04, target: x86_64},
+          {os: macos-13, target: x86_64},
+          {os: macos-14, target: aarch64}
+        ]
         python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
 
   release:
     needs: python
     uses: ./.github/workflows/pypi_release.yml
     with:
-      os: ${{ matrix.os }}
-      target: ${{ matrix.target }}
+      os: ${{ matrix.targets.os }}
+      target: ${{ matrix.targets.target }}
       python-version: ${{ matrix.python-version }}
-    name: Release (${{ matrix.os }})
+    name: Release (${{ matrix.targets.os }} ${{ matrix.targets.target }})
     if: startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, macos-13]
-        target: [x86_64]
+        targets: [
+          {os: ubuntu-20.04, target: x86_64},
+          {os: macos-13, target: x86_64},
+          {os: macos-14, target: aarch64}
+        ]
         python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
     permissions:
       contents: read
